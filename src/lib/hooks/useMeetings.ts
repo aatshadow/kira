@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useMeetingStore } from '@/stores/meetingStore'
 import { createClient } from '@/lib/supabase/client'
 import { getUserId } from '@/lib/supabase/getUserId'
@@ -16,26 +16,31 @@ export function useMeetings() {
     localStorage.setItem('kira_demo_meetings', JSON.stringify(useMeetingStore.getState().meetings))
   }, [])
 
+  const hasFetched = useRef(false)
+
   const fetchMeetings = useCallback(async () => {
-    setLoading(true)
+    const store = useMeetingStore.getState()
+    store.setLoading(true)
     try {
       if (IS_DEMO) {
         const saved = localStorage.getItem('kira_demo_meetings')
-        if (saved) setMeetings(JSON.parse(saved))
+        if (saved) store.setMeetings(JSON.parse(saved))
         return
       }
 
       const supabase = createClient()
       const { data } = await supabase.from('meetings').select('*').order('scheduled_at', { ascending: false })
-      if (data) setMeetings(data)
+      if (data) store.setMeetings(data)
     } catch (err) {
       console.error('[KIRA] fetchMeetings error:', err)
     } finally {
-      setLoading(false)
+      useMeetingStore.getState().setLoading(false)
     }
-  }, [setMeetings, setLoading])
+  }, [])
 
   useEffect(() => {
+    if (hasFetched.current) return
+    hasFetched.current = true
     fetchMeetings()
   }, [fetchMeetings])
 

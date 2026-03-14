@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useTaskStore } from '@/stores/taskStore'
 import { createClient } from '@/lib/supabase/client'
 import { getUserId } from '@/lib/supabase/getUserId'
@@ -32,22 +32,24 @@ export function useTasks() {
     setLoading,
   } = useTaskStore()
 
+  const hasFetched = useRef(false)
+
   const fetchAll = useCallback(async () => {
-    setLoading(true)
+    const store = useTaskStore.getState()
+    store.setLoading(true)
     try {
       if (IS_DEMO) {
         const saved = localStorage.getItem('kira_demo_tasks')
-        if (saved) setTasks(JSON.parse(saved))
-        setCategories(DEMO_CATEGORIES)
+        if (saved) store.setTasks(JSON.parse(saved))
+        store.setCategories(DEMO_CATEGORIES)
         const savedProjects = localStorage.getItem('kira_demo_projects')
-        if (savedProjects) setProjects(JSON.parse(savedProjects))
+        if (savedProjects) store.setProjects(JSON.parse(savedProjects))
         const savedTags = localStorage.getItem('kira_demo_tags')
-        if (savedTags) setTags(JSON.parse(savedTags))
+        if (savedTags) store.setTags(JSON.parse(savedTags))
         return
       }
 
       const supabase = createClient()
-      console.log('[KIRA] fetchAll: starting queries...')
       const [tasksRes, catsRes, projsRes, tagsRes] = await Promise.all([
         supabase.from('tasks').select('*').neq('status', 'deleted').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
         supabase.from('categories').select('*').order('is_default', { ascending: false }),
@@ -55,23 +57,20 @@ export function useTasks() {
         supabase.from('tags').select('*').order('name'),
       ])
 
-      console.log('[KIRA] tasks:', tasksRes.data?.length, tasksRes.error)
-      console.log('[KIRA] categories:', catsRes.data?.length, catsRes.error)
-      console.log('[KIRA] projects:', projsRes.data?.length, projsRes.error)
-      console.log('[KIRA] tags:', tagsRes.data?.length, tagsRes.error)
-
-      if (tasksRes.data) setTasks(tasksRes.data)
-      if (catsRes.data) setCategories(catsRes.data)
-      if (projsRes.data) setProjects(projsRes.data)
-      if (tagsRes.data) setTags(tagsRes.data)
+      if (tasksRes.data) store.setTasks(tasksRes.data)
+      if (catsRes.data) store.setCategories(catsRes.data)
+      if (projsRes.data) store.setProjects(projsRes.data)
+      if (tagsRes.data) store.setTags(tagsRes.data)
     } catch (err) {
       console.error('[KIRA] fetchAll error:', err)
     } finally {
-      setLoading(false)
+      useTaskStore.getState().setLoading(false)
     }
-  }, [setTasks, setCategories, setProjects, setTags, setLoading])
+  }, [])
 
   useEffect(() => {
+    if (hasFetched.current) return
+    hasFetched.current = true
     fetchAll()
   }, [fetchAll])
 
