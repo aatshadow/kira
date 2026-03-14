@@ -21,7 +21,6 @@ export function useTimer() {
   } = useTimerStore()
 
   const { updateTask } = useTaskStore()
-  const supabase = IS_DEMO ? null : createClient()
 
   useEffect(() => {
     if (!activeSessionId) return
@@ -41,6 +40,7 @@ export function useTimer() {
 
   const startTimer = useCallback(
     async (taskId: string, taskTitle: string, taskCategory: string, taskProject: string) => {
+      const supabase = IS_DEMO ? null : createClient()
       const currentActive = activeSessionId
       if (currentActive) {
         pauseSession(currentActive)
@@ -79,17 +79,18 @@ export function useTimer() {
       addSession(newSession)
       setActiveSession(sessionId)
     },
-    [activeSessionId, addSession, pauseSession, setActiveSession, supabase, updateTask]
+    [activeSessionId, addSession, pauseSession, setActiveSession, updateTask]
   )
 
   const handlePause = useCallback(
     async (sessionId: string) => {
       pauseSession(sessionId)
       if (!IS_DEMO) {
-        await supabase!.from('timer_sessions').update({ paused_at: new Date().toISOString(), status: 'paused' }).eq('id', sessionId)
+        const supabase = createClient()
+        await supabase.from('timer_sessions').update({ paused_at: new Date().toISOString(), status: 'paused' }).eq('id', sessionId)
       }
     },
-    [pauseSession, supabase]
+    [pauseSession]
   )
 
   const handleResume = useCallback(
@@ -97,15 +98,17 @@ export function useTimer() {
       const currentActive = activeSessionId
       if (currentActive && currentActive !== sessionId) {
         if (!IS_DEMO) {
-          await supabase!.from('timer_sessions').update({ paused_at: new Date().toISOString(), status: 'paused' }).eq('id', currentActive)
+          const supabase = createClient()
+          await supabase.from('timer_sessions').update({ paused_at: new Date().toISOString(), status: 'paused' }).eq('id', currentActive)
         }
       }
       resumeSession(sessionId)
       if (!IS_DEMO) {
-        await supabase!.from('timer_sessions').update({ paused_at: null, status: 'running' }).eq('id', sessionId)
+        const supabase = createClient()
+        await supabase.from('timer_sessions').update({ paused_at: null, status: 'running' }).eq('id', sessionId)
       }
     },
-    [activeSessionId, resumeSession, supabase]
+    [activeSessionId, resumeSession]
   )
 
   const stopTimer = useCallback(
@@ -114,6 +117,7 @@ export function useTimer() {
       if (!session) return
 
       const netSecs = session.elapsedSecs
+      const supabase = IS_DEMO ? null : createClient()
 
       if (!IS_DEMO) {
         await supabase!.from('timer_sessions').update({ ended_at: new Date().toISOString(), net_secs: netSecs, status: 'completed' }).eq('id', sessionId)
@@ -133,14 +137,13 @@ export function useTimer() {
 
       removeSession(sessionId)
 
-      // Persist tasks in demo mode
       if (IS_DEMO) {
         setTimeout(() => {
           localStorage.setItem('kira_demo_tasks', JSON.stringify(useTaskStore.getState().tasks))
         }, 0)
       }
     },
-    [sessions, removeSession, supabase, updateTask]
+    [sessions, removeSession, updateTask]
   )
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) || null

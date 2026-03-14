@@ -32,46 +32,43 @@ export function useTasks() {
     setLoading,
   } = useTaskStore()
 
-  const supabase = IS_DEMO ? null : createClient()
-
   const fetchAll = useCallback(async () => {
     setLoading(true)
+    try {
+      if (IS_DEMO) {
+        const saved = localStorage.getItem('kira_demo_tasks')
+        if (saved) setTasks(JSON.parse(saved))
+        setCategories(DEMO_CATEGORIES)
+        const savedProjects = localStorage.getItem('kira_demo_projects')
+        if (savedProjects) setProjects(JSON.parse(savedProjects))
+        const savedTags = localStorage.getItem('kira_demo_tags')
+        if (savedTags) setTags(JSON.parse(savedTags))
+        return
+      }
 
-    if (IS_DEMO) {
-      // Load from localStorage in demo mode
-      const saved = localStorage.getItem('kira_demo_tasks')
-      if (saved) setTasks(JSON.parse(saved))
-      setCategories(DEMO_CATEGORIES)
+      const supabase = createClient()
+      const [tasksRes, catsRes, projsRes, tagsRes] = await Promise.all([
+        supabase.from('tasks').select('*').neq('status', 'deleted').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
+        supabase.from('categories').select('*').order('is_default', { ascending: false }),
+        supabase.from('projects').select('*').eq('is_archived', false).order('name'),
+        supabase.from('tags').select('*').order('name'),
+      ])
 
-      const savedProjects = localStorage.getItem('kira_demo_projects')
-      if (savedProjects) setProjects(JSON.parse(savedProjects))
-
-      const savedTags = localStorage.getItem('kira_demo_tags')
-      if (savedTags) setTags(JSON.parse(savedTags))
-
+      if (tasksRes.data) setTasks(tasksRes.data)
+      if (catsRes.data) setCategories(catsRes.data)
+      if (projsRes.data) setProjects(projsRes.data)
+      if (tagsRes.data) setTags(tagsRes.data)
+    } catch (err) {
+      console.error('[KIRA] fetchAll error:', err)
+    } finally {
       setLoading(false)
-      return
     }
-
-    const [tasksRes, catsRes, projsRes, tagsRes] = await Promise.all([
-      supabase!.from('tasks').select('*').neq('status', 'deleted').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
-      supabase!.from('categories').select('*').order('is_default', { ascending: false }),
-      supabase!.from('projects').select('*').eq('is_archived', false).order('name'),
-      supabase!.from('tags').select('*').order('name'),
-    ])
-
-    if (tasksRes.data) setTasks(tasksRes.data)
-    if (catsRes.data) setCategories(catsRes.data)
-    if (projsRes.data) setProjects(projsRes.data)
-    if (tagsRes.data) setTags(tagsRes.data)
-    setLoading(false)
-  }, [supabase, setTasks, setCategories, setProjects, setTags, setLoading])
+  }, [setTasks, setCategories, setProjects, setTags, setLoading])
 
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
 
-  // Persist demo data to localStorage
   const persistDemo = useCallback((updatedTasks?: Task[]) => {
     if (!IS_DEMO) return
     const current = updatedTasks || useTaskStore.getState().tasks
@@ -109,13 +106,15 @@ export function useTasks() {
         return task
       }
 
+      const supabase = createClient()
       const userId = await getUserId()
-      const { data: task, error } = await supabase!.from('tasks').insert({ ...data, user_id: userId }).select().single()
-      if (error || !task) return null
+      const { data: task, error } = await supabase.from('tasks').insert({ ...data, user_id: userId }).select().single()
+      if (error) { console.error('[KIRA] createTask error:', error); return null }
+      if (!task) return null
       addTask(task)
       return task
     },
-    [supabase, addTask, persistDemo]
+    [addTask, persistDemo]
   )
 
   const editTask = useCallback(
@@ -126,10 +125,11 @@ export function useTasks() {
         return
       }
 
-      const { error } = await supabase!.from('tasks').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+      const supabase = createClient()
+      const { error } = await supabase.from('tasks').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
       if (!error) updateTask(id, data)
     },
-    [supabase, updateTask, persistDemo]
+    [updateTask, persistDemo]
   )
 
   const deleteTask = useCallback(
@@ -140,10 +140,11 @@ export function useTasks() {
         return
       }
 
-      await supabase!.from('tasks').update({ status: 'deleted', updated_at: new Date().toISOString() }).eq('id', id)
+      const supabase = createClient()
+      await supabase.from('tasks').update({ status: 'deleted', updated_at: new Date().toISOString() }).eq('id', id)
       removeTask(id)
     },
-    [supabase, removeTask, persistDemo]
+    [removeTask, persistDemo]
   )
 
   const completeTask = useCallback(
@@ -161,10 +162,11 @@ export function useTasks() {
         return
       }
 
-      await supabase!.from('tasks').update(update).eq('id', id)
+      const supabase = createClient()
+      await supabase.from('tasks').update(update).eq('id', id)
       updateTask(id, update)
     },
-    [supabase, updateTask, persistDemo]
+    [updateTask, persistDemo]
   )
 
   return {

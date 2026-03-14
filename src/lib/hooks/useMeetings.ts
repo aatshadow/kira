@@ -11,8 +11,6 @@ export function useMeetings() {
   const { meetings, loading, setMeetings, addMeeting, updateMeeting, removeMeeting, setLoading } =
     useMeetingStore()
 
-  const supabase = IS_DEMO ? null : createClient()
-
   const persistDemo = useCallback(() => {
     if (!IS_DEMO) return
     localStorage.setItem('kira_demo_meetings', JSON.stringify(useMeetingStore.getState().meetings))
@@ -20,18 +18,22 @@ export function useMeetings() {
 
   const fetchMeetings = useCallback(async () => {
     setLoading(true)
+    try {
+      if (IS_DEMO) {
+        const saved = localStorage.getItem('kira_demo_meetings')
+        if (saved) setMeetings(JSON.parse(saved))
+        return
+      }
 
-    if (IS_DEMO) {
-      const saved = localStorage.getItem('kira_demo_meetings')
-      if (saved) setMeetings(JSON.parse(saved))
+      const supabase = createClient()
+      const { data } = await supabase.from('meetings').select('*').order('scheduled_at', { ascending: false })
+      if (data) setMeetings(data)
+    } catch (err) {
+      console.error('[KIRA] fetchMeetings error:', err)
+    } finally {
       setLoading(false)
-      return
     }
-
-    const { data } = await supabase!.from('meetings').select('*').order('scheduled_at', { ascending: false })
-    if (data) setMeetings(data)
-    setLoading(false)
-  }, [supabase, setMeetings, setLoading])
+  }, [setMeetings, setLoading])
 
   useEffect(() => {
     fetchMeetings()
@@ -61,13 +63,15 @@ export function useMeetings() {
         return meeting
       }
 
+      const supabase = createClient()
       const userId = await getUserId()
-      const { data: meeting, error } = await supabase!.from('meetings').insert({ ...data, user_id: userId }).select().single()
-      if (error || !meeting) return null
+      const { data: meeting, error } = await supabase.from('meetings').insert({ ...data, user_id: userId }).select().single()
+      if (error) { console.error('[KIRA] createMeeting error:', error); return null }
+      if (!meeting) return null
       addMeeting(meeting)
       return meeting
     },
-    [supabase, addMeeting, persistDemo]
+    [addMeeting, persistDemo]
   )
 
   const editMeeting = useCallback(
@@ -78,10 +82,11 @@ export function useMeetings() {
         return
       }
 
-      await supabase!.from('meetings').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+      const supabase = createClient()
+      await supabase.from('meetings').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
       updateMeeting(id, data)
     },
-    [supabase, updateMeeting, persistDemo]
+    [updateMeeting, persistDemo]
   )
 
   const deleteMeeting = useCallback(
@@ -92,10 +97,11 @@ export function useMeetings() {
         return
       }
 
-      await supabase!.from('meetings').delete().eq('id', id)
+      const supabase = createClient()
+      await supabase.from('meetings').delete().eq('id', id)
       removeMeeting(id)
     },
-    [supabase, removeMeeting, persistDemo]
+    [removeMeeting, persistDemo]
   )
 
   return {
