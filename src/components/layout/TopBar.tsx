@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Clock, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -30,7 +31,8 @@ export function TopBar() {
     <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-border/50 bg-background/85 backdrop-blur-xl">
       <div className="flex h-full items-center px-6 lg:px-10 max-w-[1400px] mx-auto">
         {/* Logo */}
-        <Link href="/" className="mr-8 shrink-0">
+        <Link href="/" className="mr-8 shrink-0 flex items-center gap-2">
+          <Image src="/logo.png" alt="KIRA" width={24} height={24} className="rounded-full" />
           <span className="text-sm font-bold tracking-[0.15em] text-foreground">KIRA</span>
         </Link>
 
