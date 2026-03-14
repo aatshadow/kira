@@ -88,9 +88,8 @@ export function TaskModal() {
         }),
       })
 
-      if (!res.ok) throw new Error('Error al procesar')
-
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al procesar')
 
       // Fill form fields with AI result
       setTitle(data.title || '')
@@ -106,7 +105,7 @@ export function TaskModal() {
       // Switch to manual mode so user can review
       setMode('manual')
     } catch {
-      setAiError('Error al procesar el texto. Inténtalo de nuevo.')
+      setAiError(err instanceof Error ? err.message : 'Error al procesar el texto. Inténtalo de nuevo.')
     } finally {
       setAiLoading(false)
     }

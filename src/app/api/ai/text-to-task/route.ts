@@ -94,8 +94,9 @@ Rules:
     }
 
     return NextResponse.json(parsed)
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[KIRA AI] text-to-task error:', err)
-    return NextResponse.json({ error: 'Failed to parse task' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Failed to parse task'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
