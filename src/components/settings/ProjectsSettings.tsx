@@ -16,7 +16,7 @@ export function ProjectsSettings() {
   const handleAdd = async () => {
     if (!newName.trim()) return
     if (IS_DEMO) {
-      addProject({ id: demoId(), user_id: 'demo', name: newName.trim(), is_archived: false, created_at: new Date().toISOString() })
+      addProject({ id: demoId(), user_id: 'demo', name: newName.trim(), description: null, category_id: null, is_archived: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       setNewName('')
       return
     }
