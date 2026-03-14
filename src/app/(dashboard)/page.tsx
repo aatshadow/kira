@@ -20,7 +20,7 @@ interface CalendarEvent {
   title: string
   start: string
   end: string
-  attendees?: { email: string; displayName?: string }[]
+  attendees?: string
 }
 
 interface UnifiedMeeting {
@@ -171,15 +171,11 @@ export default function DashboardPage() {
       .filter((e) => new Date(e.start) > now)
       .forEach((e) => {
         const durationMs = new Date(e.end).getTime() - new Date(e.start).getTime()
-        const attendeeNames = e.attendees
-          ?.map((a) => a.displayName || a.email)
-          .join(', ')
-
         unified.push({
           id: e.id,
           title: e.title,
           dateTime: new Date(e.start),
-          participants: attendeeNames || null,
+          participants: e.attendees || null,
           source: 'gcal',
           durationMins: Math.round(durationMs / 60000),
         })
