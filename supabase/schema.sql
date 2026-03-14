@@ -106,6 +106,20 @@ CREATE TABLE tags (
   UNIQUE(user_id, name)
 );
 
+-- KIRA SUMMARIES (AI-generated daily/weekly/monthly summaries)
+CREATE TABLE kira_summaries (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  period        TEXT CHECK (period IN ('daily','weekly','monthly')) NOT NULL,
+  period_start  TIMESTAMPTZ NOT NULL,
+  period_end    TIMESTAMPTZ NOT NULL,
+  content       TEXT NOT NULL,
+  metrics       JSONB DEFAULT '{}',
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, period)
+);
+
 -- ROW LEVEL SECURITY
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
@@ -114,6 +128,7 @@ ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kira_summaries ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users see own data" ON profiles FOR ALL USING (auth.uid() = id);
 CREATE POLICY "Users see own tasks" ON tasks FOR ALL USING (auth.uid() = user_id);
@@ -122,6 +137,7 @@ CREATE POLICY "Users see own meetings" ON meetings FOR ALL USING (auth.uid() = u
 CREATE POLICY "Users see own categories" ON categories FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users see own projects" ON projects FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users see own tags" ON tags FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users see own summaries" ON kira_summaries FOR ALL USING (auth.uid() = user_id);
 
 -- INDEXES
 CREATE INDEX idx_tasks_user_status ON tasks(user_id, status);

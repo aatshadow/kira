@@ -1,26 +1,144 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState, useCallback } from 'react'
 import { DayStatus } from '@/components/dashboard/DayStatus'
 import { ActiveSession } from '@/components/dashboard/ActiveSession'
 import { QuickBacklog } from '@/components/dashboard/QuickBacklog'
 import { useTasks } from '@/lib/hooks/useTasks'
 import { useTaskStore } from '@/stores/taskStore'
 import { useMeetingStore } from '@/stores/meetingStore'
-import { Clock, ListTodo } from 'lucide-react'
+import { Clock, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
-import { useUIStore } from '@/stores/uiStore'
-import { Badge } from '@/components/ui/badge'
 import { formatDuration } from '@/lib/utils/time'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useUIStore } from '@/stores/uiStore'
+import { IS_DEMO } from '@/lib/demo'
+
+interface CalendarEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+  attendees?: { email: string; displayName?: string }[]
+}
+
+interface UnifiedMeeting {
+  id: string
+  title: string
+  dateTime: Date
+  participants: string | null
+  source: 'kira' | 'gcal'
+  durationMins: number | null
+}
+
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 
 export default function DashboardPage() {
-  useTasks() // trigger fetch
+  useTasks()
   const { tasks } = useTaskStore()
   const { meetings } = useMeetingStore()
   const { openModal } = useUIStore()
+
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
+
+  // Daily summary state
+  const [summaryText, setSummaryText] = useState<string | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryExpanded, setSummaryExpanded] = useState(false)
+
+  // Fetch Google Calendar events
+  useEffect(() => {
+    if (IS_DEMO) return
+
+    async function fetchCalendarEvents() {
+      try {
+        const now = new Date()
+        const timeMax = new Date()
+        timeMax.setDate(timeMax.getDate() + 7)
+
+        const params = new URLSearchParams({
+          timeMin: now.toISOString(),
+          timeMax: timeMax.toISOString(),
+        })
+
+        const res = await fetch(`/api/calendar/events?${params}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setCalendarEvents(data.events || [])
+      } catch {
+        // Calendar not connected - silently ignore
+      }
+    }
+
+    fetchCalendarEvents()
+  }, [])
+
+  // Generate daily summary via POST
+  const generateSummary = useCallback(async () => {
+    if (IS_DEMO) return
+    setSummaryLoading(true)
+    try {
+      const res = await fetch('/api/ai/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period: 'daily' }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.summary) {
+        setSummaryText(data.summary)
+        setSummaryExpanded(true)
+      }
+    } catch {
+      // Silently ignore
+    } finally {
+      setSummaryLoading(false)
+    }
+  }, [])
+
+  // Fetch existing daily summary on mount, auto-generate if stale
+  useEffect(() => {
+    if (IS_DEMO) return
+
+    async function fetchSummary() {
+      try {
+        const res = await fetch('/api/ai/summary?period=daily')
+        if (!res.ok) return
+        const data = await res.json()
+        const summaries = data.summaries || []
+
+        if (summaries.length > 0) {
+          const latest = summaries[0]
+          const updatedAt = new Date(latest.updated_at).getTime()
+          const now = Date.now()
+
+          if (now - updatedAt < TWO_HOURS_MS) {
+            setSummaryText(latest.content)
+            return
+          }
+        }
+
+        // No summary or stale - auto-generate
+        generateSummary()
+      } catch {
+        // Silently ignore
+      }
+    }
+
+    fetchSummary()
+  }, [generateSummary])
+
+  // Calculate calendar events duration for today (for DayStatus)
+  const calendarEventsMinsToday = useMemo(() => {
+    const todayStr = new Date().toDateString()
+    return calendarEvents
+      .filter((e) => new Date(e.start).toDateString() === todayStr && new Date(e.end) <= new Date())
+      .reduce((sum, e) => {
+        const durationMs = new Date(e.end).getTime() - new Date(e.start).getTime()
+        return sum + Math.round(durationMs / 60000)
+      }, 0)
+  }, [calendarEvents])
 
   const todayCompleted = useMemo(() => {
     const today = new Date().toDateString()
@@ -29,12 +147,46 @@ export default function DashboardPage() {
     )
   }, [tasks])
 
-  const nextMeeting = useMemo(() => {
+  // Combine KIRA meetings + Google Calendar events, sorted, next 3
+  const nextMeetings = useMemo(() => {
     const now = new Date()
-    return meetings
+    const unified: UnifiedMeeting[] = []
+
+    // KIRA meetings
+    meetings
       .filter((m) => m.status === 'scheduled' && m.scheduled_at && new Date(m.scheduled_at) > now)
-      .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())[0]
-  }, [meetings])
+      .forEach((m) => {
+        unified.push({
+          id: m.id,
+          title: m.title,
+          dateTime: new Date(m.scheduled_at!),
+          participants: m.participants,
+          source: 'kira',
+          durationMins: m.duration_mins,
+        })
+      })
+
+    // Google Calendar events
+    calendarEvents
+      .filter((e) => new Date(e.start) > now)
+      .forEach((e) => {
+        const durationMs = new Date(e.end).getTime() - new Date(e.start).getTime()
+        const attendeeNames = e.attendees
+          ?.map((a) => a.displayName || a.email)
+          .join(', ')
+
+        unified.push({
+          id: e.id,
+          title: e.title,
+          dateTime: new Date(e.start),
+          participants: attendeeNames || null,
+          source: 'gcal',
+          durationMins: Math.round(durationMs / 60000),
+        })
+      })
+
+    return unified.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime()).slice(0, 3)
+  }, [meetings, calendarEvents])
 
   if (tasks.length === 0) {
     return (
@@ -52,25 +204,19 @@ export default function DashboardPage() {
 
   return (
     <div className="py-4 md:py-8 space-y-4 md:space-y-6">
-      {/* Top row */}
-      <DayStatus totalWorkedMins={0} dailyGoalHours={8} />
+      <DayStatus dailyGoalHours={8} calendarEventsMins={calendarEventsMinsToday} />
 
-      {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Active session - takes 2 cols */}
         <div className="lg:col-span-2">
           <ActiveSession />
         </div>
-
-        {/* Quick backlog */}
         <div>
           <QuickBacklog />
         </div>
       </div>
 
-      {/* Bottom section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Today's completed */}
+        {/* Completed today */}
         <div className="rounded-lg border border-border bg-card p-5">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
             Completadas hoy
@@ -93,25 +239,108 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Next meeting */}
+        {/* Next 3 meetings */}
         <div className="rounded-lg border border-border bg-card p-5">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-            Próximo meeting
+            Próximos meetings
           </h3>
-          {nextMeeting ? (
-            <div>
-              <p className="text-sm font-medium text-foreground mb-1">{nextMeeting.title}</p>
-              <p className="text-xs text-muted-foreground">
-                {format(new Date(nextMeeting.scheduled_at!), "EEEE d 'de' MMMM, HH:mm", { locale: es })}
-              </p>
-              {nextMeeting.participants && (
-                <p className="text-xs text-muted-foreground mt-1">{nextMeeting.participants}</p>
-              )}
-            </div>
-          ) : (
+          {nextMeetings.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">Sin meetings programados</p>
+          ) : (
+            <div className="space-y-3">
+              {nextMeetings.map((meeting) => (
+                <div key={`${meeting.source}-${meeting.id}`} className="flex items-start gap-3 py-1">
+                  <span
+                    className="mt-1.5 h-2 w-2 rounded-full flex-shrink-0"
+                    style={{
+                      backgroundColor: meeting.source === 'kira' ? '#A855F7' : '#3B82F6',
+                    }}
+                    title={meeting.source === 'kira' ? 'KIRA Meeting' : 'Google Calendar'}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">{meeting.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(meeting.dateTime, "EEEE d 'de' MMMM, HH:mm", { locale: es })}
+                      {meeting.durationMins && (
+                        <span className="text-muted-foreground/60"> · {formatDuration(meeting.durationMins)}</span>
+                      )}
+                    </p>
+                    {meeting.participants && (
+                      <p className="text-xs text-muted-foreground/70 mt-0.5 truncate">
+                        {meeting.participants}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
+      </div>
+
+      {/* Daily summary */}
+      <div className="rounded-lg border border-border bg-card p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Resumen del día
+          </h3>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={generateSummary}
+              disabled={summaryLoading}
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors disabled:opacity-50 cursor-pointer"
+              title="Regenerar resumen"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${summaryLoading ? 'animate-spin' : ''}`} />
+            </button>
+            {summaryText && (
+              <button
+                onClick={() => setSummaryExpanded(!summaryExpanded)}
+                className="p-1.5 rounded-md hover:bg-secondary transition-colors cursor-pointer"
+              >
+                {summaryExpanded ? (
+                  <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {summaryLoading && !summaryText && (
+          <div className="py-4 flex items-center gap-2">
+            <div className="h-1.5 w-1.5 rounded-full bg-[#00D4FF] animate-pulse" />
+            <p className="text-sm text-muted-foreground">Generando resumen con IA...</p>
+          </div>
+        )}
+
+        {!summaryLoading && !summaryText && (
+          <p className="text-sm text-muted-foreground py-2">
+            Sin resumen disponible.{' '}
+            <button
+              onClick={generateSummary}
+              className="text-[#00D4FF] hover:underline cursor-pointer"
+            >
+              Generar ahora
+            </button>
+          </p>
+        )}
+
+        {summaryText && summaryExpanded && (
+          <div className="mt-2 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+            {summaryText}
+          </div>
+        )}
+
+        {summaryText && !summaryExpanded && (
+          <button
+            onClick={() => setSummaryExpanded(true)}
+            className="mt-1 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            {summaryText.slice(0, 120).trim()}...
+          </button>
+        )}
       </div>
     </div>
   )

@@ -7,11 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MeetingCard } from '@/components/meetings/MeetingCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useMeetings } from '@/lib/hooks/useMeetings'
+import { useTasks } from '@/lib/hooks/useTasks'
 import { useUIStore } from '@/stores/uiStore'
 import type { Meeting } from '@/types/meeting'
 
 export default function ManagementMeetingsPage() {
   const { meetings, editMeeting } = useMeetings()
+  const { createTask } = useTasks()
   const { openModal } = useUIStore()
   const [tab, setTab] = useState('upcoming')
 
@@ -20,7 +22,19 @@ export default function ManagementMeetingsPage() {
   const cancelled = meetings.filter((m) => m.status === 'cancelled')
 
   const handleEdit = (meeting: Meeting) => openModal('meeting-edit', { meeting })
-  const handleComplete = async (meeting: Meeting) => await editMeeting(meeting.id, { status: 'completed' })
+  const handleComplete = async (meeting: Meeting) => {
+    await editMeeting(meeting.id, { status: 'completed' })
+    // Auto-create transcription task linked to this meeting
+    await createTask({
+      title: `📝 Transcripción: ${meeting.title}`,
+      description: `Pega la transcripción del meeting "${meeting.title}" en las notas de este meeting.`,
+      priority: 'q2',
+      status: 'todo',
+      meeting_id: meeting.id,
+      due_date: new Date().toISOString().split('T')[0],
+    })
+    openModal('meeting-edit', { meeting: { ...meeting, status: 'completed' } })
+  }
   const handleCancel = async (meeting: Meeting) => await editMeeting(meeting.id, { status: 'cancelled' })
 
   return (

@@ -12,7 +12,7 @@ import { formatTime } from '@/lib/utils/time'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 const navLinks = [
-  { href: '/', label: 'Dashboard', icon: Home },
+  { href: '/', label: 'Consola Central', icon: Home },
   { href: '/management', label: 'Management', icon: FolderKanban },
   { href: '/kira', label: 'KIRA', icon: Bot },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
