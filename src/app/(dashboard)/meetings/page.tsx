@@ -32,7 +32,7 @@ export default function MeetingsPage() {
     await editMeeting(meeting.id, { status: 'cancelled' })
   }
 
-  if (loading) {
+  if (false) {
     return (
       <div className="py-8">
         <LoadingSkeleton lines={5} />

@@ -14,7 +14,7 @@ interface MeetingStore {
 
 export const useMeetingStore = create<MeetingStore>((set) => ({
   meetings: [],
-  loading: true,
+  loading: false,
 
   setMeetings: (meetings) => set({ meetings }),
   addMeeting: (meeting) =>

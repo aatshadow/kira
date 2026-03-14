@@ -55,7 +55,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
   tags: [],
   view: 'list',
   filters: { ...defaultFilters },
-  loading: true,
+  loading: false,
 
   setTasks: (tasks) => set({ tasks }),
   addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),

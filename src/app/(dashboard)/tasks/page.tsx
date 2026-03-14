@@ -36,7 +36,7 @@ const viewLabels = {
 } as const
 
 export default function TasksPage() {
-  const { loading } = useTasks()
+  useTasks() // trigger fetch
   const { tasks, categories, projects, view, filters, setView, setFilter } = useTaskStore()
   const { openModal } = useUIStore()
 
@@ -67,14 +67,6 @@ export default function TasksPage() {
 
     return result
   }, [tasks, filters])
-
-  if (loading) {
-    return (
-      <div className="py-8">
-        <LoadingSkeleton lines={8} />
-      </div>
-    )
-  }
 
   // Group by category or project views
   const renderGroupedView = (groupBy: 'category' | 'project') => {

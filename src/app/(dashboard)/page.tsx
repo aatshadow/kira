@@ -17,7 +17,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 export default function DashboardPage() {
-  const { loading } = useTasks()
+  useTasks() // trigger fetch
   const { tasks } = useTaskStore()
   const { meetings } = useMeetingStore()
   const { openModal } = useUIStore()
@@ -35,14 +35,6 @@ export default function DashboardPage() {
       .filter((m) => m.status === 'scheduled' && m.scheduled_at && new Date(m.scheduled_at) > now)
       .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())[0]
   }, [meetings])
-
-  if (loading) {
-    return (
-      <div className="py-8">
-        <LoadingSkeleton lines={3} />
-      </div>
-    )
-  }
 
   if (tasks.length === 0) {
     return (
