@@ -13,6 +13,7 @@ const navLinks = [
   { href: '/', label: 'Dashboard' },
   { href: '/tasks', label: 'Tasks' },
   { href: '/meetings', label: 'Meetings' },
+  { href: '/kira', label: 'KIRA' },
   { href: '/analytics', label: 'Analytics' },
   { href: '/settings', label: 'Settings' },
 ]
