@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,75 +45,108 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* KIRA Custom Colors */
+  --color-kira: var(--kira-accent);
+  --color-kira-dim: var(--kira-accent-dim);
+  --color-kira-subtle: var(--kira-accent-subtle);
+  --color-priority-q1: #FF4444;
+  --color-priority-q2: #F5A623;
+  --color-priority-q3: #00D4FF;
+  --color-priority-q4: #444444;
+  --color-success: #22C55A;
+  --color-warning: #F5A623;
 }
 
+/* ============================================
+   KIRA DESIGN SYSTEM — Dark Mode First
+   ============================================ */
+
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* KIRA Accent — Hextech Cyan */
+  --kira-accent: #00D4FF;
+  --kira-accent-dim: #00A8CC;
+  --kira-accent-subtle: rgba(0, 212, 255, 0.08);
+  --kira-accent-border: rgba(0, 212, 255, 0.25);
+  --kira-glow-sm: 0 0 8px rgba(0, 212, 255, 0.4);
+  --kira-glow-md: 0 0 20px rgba(0, 212, 255, 0.35), 0 0 40px rgba(0, 212, 255, 0.15);
+  --kira-glow-lg: 0 0 30px rgba(0, 212, 255, 0.5), 0 0 60px rgba(0, 212, 255, 0.2);
+
+  /* Light mode base */
+  --background: #F8F8F8;
+  --foreground: #0A0A0A;
+  --card: #FFFFFF;
+  --card-foreground: #0A0A0A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0A0A0A;
+  --primary: #0A0A0A;
+  --primary-foreground: #F8F8F8;
+  --secondary: #EFEFEF;
+  --secondary-foreground: #0A0A0A;
+  --muted: #EFEFEF;
+  --muted-foreground: #555555;
+  --accent: #EFEFEF;
+  --accent-foreground: #0A0A0A;
+  --destructive: #FF4444;
+  --border: #DEDEDE;
+  --input: #DEDEDE;
+  --ring: #0096FF;
+  --chart-1: #00D4FF;
+  --chart-2: #0096FF;
+  --chart-3: #22C55A;
+  --chart-4: #F5A623;
+  --chart-5: #FF4444;
+  --radius: 0.5rem;
+  --sidebar: #F8F8F8;
+  --sidebar-foreground: #0A0A0A;
+  --sidebar-primary: #0A0A0A;
+  --sidebar-primary-foreground: #F8F8F8;
+  --sidebar-accent: #EFEFEF;
+  --sidebar-accent-foreground: #0A0A0A;
+  --sidebar-border: #DEDEDE;
+  --sidebar-ring: #0096FF;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --kira-accent: #00D4FF;
+  --kira-accent-dim: #00A8CC;
+  --kira-accent-subtle: rgba(0, 212, 255, 0.08);
+  --kira-accent-border: rgba(0, 212, 255, 0.25);
+  --kira-glow-sm: 0 0 8px rgba(0, 212, 255, 0.4);
+  --kira-glow-md: 0 0 20px rgba(0, 212, 255, 0.35), 0 0 40px rgba(0, 212, 255, 0.15);
+  --kira-glow-lg: 0 0 30px rgba(0, 212, 255, 0.5), 0 0 60px rgba(0, 212, 255, 0.2);
+
+  --background: #080808;
+  --foreground: #F0F0F0;
+  --card: #0F0F0F;
+  --card-foreground: #F0F0F0;
+  --popover: #0F0F0F;
+  --popover-foreground: #F0F0F0;
+  --primary: #F0F0F0;
+  --primary-foreground: #080808;
+  --secondary: #171717;
+  --secondary-foreground: #F0F0F0;
+  --muted: #171717;
+  --muted-foreground: #888888;
+  --accent: #171717;
+  --accent-foreground: #F0F0F0;
+  --destructive: #FF4444;
+  --border: #242424;
+  --input: #242424;
+  --ring: #00D4FF;
+  --chart-1: #00D4FF;
+  --chart-2: #0096FF;
+  --chart-3: #22C55A;
+  --chart-4: #F5A623;
+  --chart-5: #FF4444;
+  --sidebar: #0F0F0F;
+  --sidebar-foreground: #F0F0F0;
+  --sidebar-primary: #00D4FF;
+  --sidebar-primary-foreground: #080808;
+  --sidebar-accent: #171717;
+  --sidebar-accent-foreground: #F0F0F0;
+  --sidebar-border: #242424;
+  --sidebar-ring: #00D4FF;
 }
 
 @layer base {
@@ -122,8 +155,98 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-variant-numeric: tabular-nums;
   }
   html {
     @apply font-sans;
   }
+}
+
+/* ============================================
+   KIRA ANIMATIONS
+   ============================================ */
+
+@keyframes kira-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+@keyframes kira-glow-breathe {
+  0%, 100% { text-shadow: 0 0 20px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.15); }
+  50% { text-shadow: 0 0 30px rgba(0,212,255,0.5), 0 0 60px rgba(0,212,255,0.25); }
+}
+
+@keyframes kira-float-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes kira-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes kira-done-flash {
+  0% { background: rgba(34,197,90,0.15); }
+  100% { background: transparent; }
+}
+
+@keyframes kira-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-kira-pulse {
+  animation: kira-pulse 2s ease-in-out infinite;
+}
+
+.animate-kira-glow {
+  animation: kira-glow-breathe 3s ease-in-out infinite;
+}
+
+.animate-kira-float-in {
+  animation: kira-float-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-kira-modal-in {
+  animation: kira-modal-in 200ms ease-out;
+}
+
+.animate-kira-done-flash {
+  animation: kira-done-flash 600ms ease-out forwards;
+}
+
+.animate-kira-shimmer {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--accent) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: kira-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Timer glow text */
+.kira-timer-glow {
+  color: var(--kira-accent);
+  text-shadow: 0 0 20px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.15);
+}
+
+.kira-timer-glow.active {
+  animation: kira-glow-breathe 3s ease-in-out infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444444;
 }
