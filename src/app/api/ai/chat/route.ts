@@ -79,8 +79,18 @@ export async function POST(request: NextRequest) {
         const calData = await calRes.json()
         const events = (calData.items || []).map((e: Record<string, unknown>) => {
           const start = (e.start as Record<string, string>)?.dateTime || (e.start as Record<string, string>)?.date || ''
-          const attendees = ((e.attendees as Array<Record<string, string>>) || []).map(a => a.email).join(', ')
-          return `  - "${e.summary}" | ${start}${attendees ? ` | With: ${attendees}` : ''}`
+          const end = (e.end as Record<string, string>)?.dateTime || (e.end as Record<string, string>)?.date || ''
+          const attendees = ((e.attendees as Array<Record<string, string>>) || []).map(a => `${a.email}(${a.responseStatus || '?'})`).join(', ')
+          const meetLink = (e.hangoutLink as string) || ''
+          const location = (e.location as string) || ''
+          const desc = (e.description as string) || ''
+          const parts = [`"${e.summary}"`, `Start:${start}`]
+          if (end) parts.push(`End:${end}`)
+          if (attendees) parts.push(`With:${attendees}`)
+          if (meetLink) parts.push(`Meet:${meetLink}`)
+          if (location) parts.push(`Location:${location}`)
+          if (desc) parts.push(`Desc:${desc.slice(0, 100)}`)
+          return `  - ${parts.join(' | ')} [gcal_id:${e.id}]`
         }).join('\n')
         calendarEventsText = events || '(no upcoming events)'
       }
@@ -167,7 +177,7 @@ You can execute actions by including JSON action blocks in your response:
 
 \`\`\`kira-action
 {
-  "action": "create_task" | "edit_task" | "delete_task" | "create_meeting" | "edit_meeting" | "delete_meeting" | "save_memory" | "delete_memory" | "create_calendar_event",
+  "action": "create_task" | "edit_task" | "delete_task" | "create_meeting" | "edit_meeting" | "delete_meeting" | "save_memory" | "delete_memory" | "create_calendar_event" | "update_calendar_event" | "delete_calendar_event",
   "data": { ... }
 }
 \`\`\`
@@ -199,7 +209,13 @@ You can execute actions by including JSON action blocks in your response:
 { "content_match": "partial text to match and delete" }
 
 **create_calendar_event** (create event in Google Calendar):
-{ "title": "string", "start": "ISO datetime", "end": "ISO datetime|null", "description": "string|null", "attendees": "comma-separated emails|null" }
+{ "title": "string", "start": "ISO datetime", "end": "ISO datetime|null", "description": "string|null", "attendees": "comma-separated emails|null", "add_meet": "boolean (true to auto-create Google Meet link)", "location": "string|null" }
+
+**update_calendar_event** (update an existing Google Calendar event — use gcal_id from the events list):
+{ "event_id": "gcal_id", "title": "string|null", "start": "ISO datetime|null", "end": "ISO datetime|null", "description": "string|null", "add_attendees": "comma-separated emails to ADD|null", "remove_attendees": "comma-separated emails to REMOVE|null", "add_meet": "boolean (true to add Google Meet link if not present)", "location": "string|null" }
+
+**delete_calendar_event** (delete/cancel a Google Calendar event):
+{ "event_id": "gcal_id", "send_notifications": "boolean (true to notify attendees, default true)" }
 
 ## Priority Matrix (Eisenhower):
 - q1: Urgente + Importante
@@ -220,7 +236,10 @@ You can execute actions by including JSON action blocks in your response:
 10. When the user tells you personal preferences, habits, or asks you to remember something, use the save_memory action.
 11. When the user greets you (buenos días, hola, etc.), give a brief, warm greeting with a quick summary of their day: pending tasks for today, upcoming meetings, and any urgent items. Use your memory to personalize.
 12. You can reference your memories naturally in conversation — "como me dijiste..." or "recuerdo que prefieres..."
-13. Never show raw IDs to the user. Use names instead.`
+13. Never show raw IDs to the user. Use names instead.
+14. For Google Calendar: you can create, update, and delete events. You can add/remove attendees, add Google Meet video calls, change times, descriptions, and locations. Use the gcal_id shown in the calendar events list to reference existing events.
+15. When the user asks to add a Meet link or video call to an event, use add_meet: true.
+16. When analyzing the calendar, provide insights about schedule density, conflicts, free slots, and meeting patterns.`
 
   try {
     const anthropicMessages = messages.map((m: ChatMessage) => ({
@@ -280,9 +299,19 @@ You can execute actions by including JSON action blocks in your response:
             break
           }
           case 'create_meeting': {
+            const md = act.data as Record<string, unknown>
+            const meetingData = {
+              title: md.title || md.summary || 'Sin título',
+              scheduled_at: md.scheduled_at || null,
+              duration_mins: md.duration_mins || null,
+              participants: md.participants || null,
+              pre_notes: md.pre_notes || null,
+              user_id: user.id,
+              status: 'scheduled',
+            }
             const { data: meeting, error } = await supabase
               .from('meetings')
-              .insert({ ...act.data, user_id: user.id, status: 'scheduled' })
+              .insert(meetingData)
               .select()
               .single()
             actionResults.push({ action: 'create_meeting', success: !error, id: meeting?.id, error: error?.message })
@@ -316,20 +345,36 @@ You can execute actions by including JSON action blocks in your response:
               actionResults.push({ action: 'create_calendar_event', success: false, error: 'Google Calendar no conectado' })
               break
             }
-            const { title: evTitle, start: evStart, end: evEnd, description: evDesc, attendees: evAttendees } = act.data as {
-              title: string; start: string; end?: string; description?: string; attendees?: string
+            const calData = act.data as Record<string, unknown> || {}
+            const evTitle = (calData.title || calData.summary || 'Sin título') as string
+            const evStart = (calData.start || calData.dateTime || calData.start_time) as string
+            const evEnd = (calData.end || calData.end_time) as string | undefined
+            const evDesc = (calData.description || calData.notes) as string | undefined
+            const evAttendees = (calData.attendees) as string | undefined
+            if (!evStart) {
+              actionResults.push({ action: 'create_calendar_event', success: false, error: 'Missing start time' })
+              break
             }
+            const evLocation = (calData.location) as string | undefined
+            const evAddMeet = calData.add_meet as boolean | undefined
             const calEvent: Record<string, unknown> = {
               summary: evTitle,
               start: { dateTime: evStart, timeZone: 'Europe/Madrid' },
               end: { dateTime: evEnd || new Date(new Date(evStart).getTime() + 60 * 60 * 1000).toISOString(), timeZone: 'Europe/Madrid' },
             }
             if (evDesc) calEvent.description = evDesc
+            if (evLocation) calEvent.location = evLocation
             if (evAttendees) {
               calEvent.attendees = evAttendees.split(',').map((email: string) => ({ email: email.trim() }))
             }
+            if (evAddMeet) {
+              calEvent.conferenceData = {
+                createRequest: { requestId: `kira-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } },
+              }
+            }
             try {
-              const calRes = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+              const calUrl = 'https://www.googleapis.com/calendar/v3/calendars/primary/events' + (evAddMeet ? '?conferenceDataVersion=1' : '')
+              const calRes = await fetch(calUrl, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(calEvent),
@@ -343,6 +388,115 @@ You can execute actions by including JSON action blocks in your response:
               })
             } catch (calErr) {
               actionResults.push({ action: 'create_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
+            }
+            break
+          }
+          case 'update_calendar_event': {
+            if (!googleToken) {
+              actionResults.push({ action: 'update_calendar_event', success: false, error: 'Google Calendar no conectado' })
+              break
+            }
+            const upData = act.data as Record<string, unknown> || {}
+            const eventId = upData.event_id as string
+            if (!eventId) {
+              actionResults.push({ action: 'update_calendar_event', success: false, error: 'Missing event_id' })
+              break
+            }
+            try {
+              // First GET the existing event
+              const getRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
+                headers: { Authorization: `Bearer ${googleToken}` },
+              })
+              if (!getRes.ok) {
+                const getErr = await getRes.json()
+                actionResults.push({ action: 'update_calendar_event', success: false, error: getErr.error?.message || 'Event not found' })
+                break
+              }
+              const existing = await getRes.json()
+
+              // Build patch
+              if (upData.title) existing.summary = upData.title
+              if (upData.start) existing.start = { dateTime: upData.start, timeZone: 'Europe/Madrid' }
+              if (upData.end) existing.end = { dateTime: upData.end, timeZone: 'Europe/Madrid' }
+              if (upData.description !== undefined) existing.description = upData.description || ''
+              if (upData.location !== undefined) existing.location = upData.location || ''
+
+              // Handle attendees
+              const currentAttendees: Array<{ email: string; responseStatus?: string }> = existing.attendees || []
+              if (upData.add_attendees) {
+                const toAdd = (upData.add_attendees as string).split(',').map(e => e.trim()).filter(Boolean)
+                for (const email of toAdd) {
+                  if (!currentAttendees.some(a => a.email === email)) {
+                    currentAttendees.push({ email })
+                  }
+                }
+                existing.attendees = currentAttendees
+              }
+              if (upData.remove_attendees) {
+                const toRemove = (upData.remove_attendees as string).split(',').map(e => e.trim().toLowerCase())
+                existing.attendees = currentAttendees.filter(a => !toRemove.includes(a.email.toLowerCase()))
+              }
+
+              // Add Meet link
+              const wantMeet = upData.add_meet as boolean
+              let confVersion = ''
+              if (wantMeet && !existing.hangoutLink) {
+                existing.conferenceData = {
+                  createRequest: { requestId: `kira-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } },
+                }
+                confVersion = '?conferenceDataVersion=1'
+              }
+
+              const separator = confVersion ? '&' : '?'
+              const patchRes = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}${confVersion}${separator}sendUpdates=all`,
+                {
+                  method: 'PUT',
+                  headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify(existing),
+                }
+              )
+              const patchResult = await patchRes.json()
+              actionResults.push({
+                action: 'update_calendar_event',
+                success: patchRes.ok,
+                id: eventId,
+                error: patchRes.ok ? undefined : patchResult.error?.message,
+              })
+            } catch (calErr) {
+              actionResults.push({ action: 'update_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
+            }
+            break
+          }
+          case 'delete_calendar_event': {
+            if (!googleToken) {
+              actionResults.push({ action: 'delete_calendar_event', success: false, error: 'Google Calendar no conectado' })
+              break
+            }
+            const delData = act.data as Record<string, unknown> || {}
+            const delEventId = delData.event_id as string
+            if (!delEventId) {
+              actionResults.push({ action: 'delete_calendar_event', success: false, error: 'Missing event_id' })
+              break
+            }
+            try {
+              const sendNotif = delData.send_notifications !== false ? 'all' : 'none'
+              const delRes = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(delEventId)}?sendUpdates=${sendNotif}`,
+                {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${googleToken}` },
+                }
+              )
+              // DELETE returns 204 No Content on success
+              actionResults.push({
+                action: 'delete_calendar_event',
+                success: delRes.status === 204 || delRes.ok,
+                id: delEventId,
+                error: delRes.ok || delRes.status === 204 ? undefined : 'Failed to delete event',
+              })
+            } catch (calErr) {
+              actionResults.push({ action: 'delete_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
             }
             break
           }

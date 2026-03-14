@@ -69,9 +69,27 @@ export function KiraChat() {
     }
   }, [])
 
+  // Load conversations and auto-load the most recent one
   useEffect(() => {
-    loadConversations()
-  }, [loadConversations])
+    const init = async () => {
+      try {
+        const res = await fetch('/api/ai/conversations')
+        if (!res.ok) return
+        const data = await res.json()
+        const convs = data.conversations || []
+        setConversations(convs)
+        // Auto-load most recent conversation if exists
+        if (convs.length > 0) {
+          const mostRecent = convs[0] // already sorted by updated_at desc
+          await loadConversation(mostRecent.id)
+        }
+      } catch {
+        // ignore
+      }
+    }
+    init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -217,6 +235,8 @@ export function KiraChat() {
       save_memory: 'Memoria guardada',
       delete_memory: 'Memoria eliminada',
       create_calendar_event: 'Evento añadido a Google Calendar',
+      update_calendar_event: 'Evento de Google Calendar actualizado',
+      delete_calendar_event: 'Evento eliminado de Google Calendar',
     }
     return labels[action] || action
   }
@@ -339,9 +359,6 @@ export function KiraChat() {
                     msg.role === 'user' ? 'justify-end' : 'justify-start'
                   )}
                 >
-                  {msg.role === 'assistant' && (
-                    <Image src="/logo.png" alt="KIRA" width={24} height={24} className="rounded-full mr-2 mt-1 shrink-0" />
-                  )}
                   <div
                     className={cn(
                       'max-w-[75%] rounded-2xl px-4 py-2.5 text-sm',
@@ -374,7 +391,6 @@ export function KiraChat() {
               ))}
               {loading && (
                 <div className="flex justify-start">
-                  <Image src="/logo.png" alt="KIRA" width={24} height={24} className="rounded-full mr-2 mt-1 shrink-0 opacity-60" />
                   <div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-[#00D4FF]" />
