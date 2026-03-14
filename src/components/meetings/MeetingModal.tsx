@@ -30,6 +30,7 @@ export function MeetingModal() {
   const [durationMins, setDurationMins] = useState('')
   const [participants, setParticipants] = useState('')
   const [preNotes, setPreNotes] = useState('')
+  const [transcript, setTranscript] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -41,6 +42,7 @@ export function MeetingModal() {
       setDurationMins(existing.duration_mins?.toString() || '')
       setParticipants(existing.participants || '')
       setPreNotes(existing.pre_notes || '')
+      setTranscript(existing.transcript || '')
     } else {
       setMode('manual')
       setTitle('')
@@ -48,6 +50,7 @@ export function MeetingModal() {
       setDurationMins('')
       setParticipants('')
       setPreNotes('')
+      setTranscript('')
       setAiText('')
       setAiError('')
     }
@@ -100,12 +103,13 @@ export function MeetingModal() {
       return
     }
     setSaving(true)
-    const data = {
+    const data: Partial<Meeting> = {
       title: title.trim(),
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       duration_mins: durationMins ? parseInt(durationMins) : null,
       participants: participants.trim() || null,
       pre_notes: preNotes.trim() || null,
+      transcript: transcript.trim() || null,
     }
     if (isEdit && existing) {
       await editMeeting(existing.id, data)
@@ -248,6 +252,24 @@ export function MeetingModal() {
                   className="bg-secondary min-h-[80px]"
                 />
               </div>
+              {isEdit && existing?.status === 'completed' && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">
+                    📝 Transcripción
+                  </Label>
+                  <Textarea
+                    placeholder="Pega aquí la transcripción del meeting..."
+                    value={transcript}
+                    onChange={(e) => setTranscript(e.target.value)}
+                    className="bg-secondary min-h-[120px] text-sm"
+                  />
+                  {transcript.trim() && (
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">
+                      {transcript.trim().split(/\s+/).length} palabras
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={closeModal}>

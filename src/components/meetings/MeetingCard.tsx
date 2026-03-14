@@ -1,6 +1,6 @@
 'use client'
 
-import { Calendar, Clock, Users, MoreHorizontal } from 'lucide-react'
+import { Calendar, Clock, Users, MoreHorizontal, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
@@ -64,6 +64,19 @@ export function MeetingCard({ meeting, onEdit, onComplete, onCancel }: MeetingCa
               <Users className="h-3 w-3" />
               {meeting.participants}
             </span>
+          )}
+          {meeting.status === 'completed' && (
+            meeting.transcript ? (
+              <span className="flex items-center gap-1 text-green-400">
+                <FileText className="h-3 w-3" />
+                Transcripción
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-amber-400">
+                <FileText className="h-3 w-3" />
+                Sin transcripción
+              </span>
+            )
           )}
         </div>
       </div>
