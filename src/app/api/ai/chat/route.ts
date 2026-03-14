@@ -59,6 +59,36 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // --- Load Google Calendar events ---
+  let calendarEventsText = '(Google Calendar no conectado)'
+  const { data: { session } } = await supabase.auth.getSession()
+  const googleToken = session?.provider_token || null
+
+  if (googleToken) {
+    try {
+      const now = new Date()
+      const timeMin = now.toISOString()
+      const timeMax = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      const calRes = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+        `timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&` +
+        `maxResults=20&singleEvents=true&orderBy=startTime`,
+        { headers: { Authorization: `Bearer ${googleToken}` } }
+      )
+      if (calRes.ok) {
+        const calData = await calRes.json()
+        const events = (calData.items || []).map((e: Record<string, unknown>) => {
+          const start = (e.start as Record<string, string>)?.dateTime || (e.start as Record<string, string>)?.date || ''
+          const attendees = ((e.attendees as Array<Record<string, string>>) || []).map(a => a.email).join(', ')
+          return `  - "${e.summary}" | ${start}${attendees ? ` | With: ${attendees}` : ''}`
+        }).join('\n')
+        calendarEventsText = events || '(no upcoming events)'
+      }
+    } catch {
+      // ignore calendar fetch errors
+    }
+  }
+
   // --- Load KIRA memories ---
   const { data: memories } = await supabase
     .from('kira_memory')
@@ -124,6 +154,9 @@ ${taskSummary || '(no tasks)'}
 ### Upcoming Meetings
 ${upcomingMeetings || '(no upcoming meetings)'}
 
+### Google Calendar (next 7 days)
+${calendarEventsText}
+
 ### Available Categories: ${categoryList || '(none)'}
 ### Available Projects: ${projectList || '(none)'}
 ### Existing Tags: ${tagList || '(none)'}
@@ -134,7 +167,7 @@ You can execute actions by including JSON action blocks in your response:
 
 \`\`\`kira-action
 {
-  "action": "create_task" | "edit_task" | "delete_task" | "create_meeting" | "edit_meeting" | "delete_meeting" | "save_memory" | "delete_memory",
+  "action": "create_task" | "edit_task" | "delete_task" | "create_meeting" | "edit_meeting" | "delete_meeting" | "save_memory" | "delete_memory" | "create_calendar_event",
   "data": { ... }
 }
 \`\`\`
@@ -164,6 +197,9 @@ You can execute actions by including JSON action blocks in your response:
 
 **delete_memory** (forget something):
 { "content_match": "partial text to match and delete" }
+
+**create_calendar_event** (create event in Google Calendar):
+{ "title": "string", "start": "ISO datetime", "end": "ISO datetime|null", "description": "string|null", "attendees": "comma-separated emails|null" }
 
 ## Priority Matrix (Eisenhower):
 - q1: Urgente + Importante
@@ -273,6 +309,41 @@ You can execute actions by including JSON action blocks in your response:
               source_conversation_id: convId,
             })
             actionResults.push({ action: 'save_memory', success: !error, error: error?.message })
+            break
+          }
+          case 'create_calendar_event': {
+            if (!googleToken) {
+              actionResults.push({ action: 'create_calendar_event', success: false, error: 'Google Calendar no conectado' })
+              break
+            }
+            const { title: evTitle, start: evStart, end: evEnd, description: evDesc, attendees: evAttendees } = act.data as {
+              title: string; start: string; end?: string; description?: string; attendees?: string
+            }
+            const calEvent: Record<string, unknown> = {
+              summary: evTitle,
+              start: { dateTime: evStart, timeZone: 'Europe/Madrid' },
+              end: { dateTime: evEnd || new Date(new Date(evStart).getTime() + 60 * 60 * 1000).toISOString(), timeZone: 'Europe/Madrid' },
+            }
+            if (evDesc) calEvent.description = evDesc
+            if (evAttendees) {
+              calEvent.attendees = evAttendees.split(',').map((email: string) => ({ email: email.trim() }))
+            }
+            try {
+              const calRes = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(calEvent),
+              })
+              const calResult = await calRes.json()
+              actionResults.push({
+                action: 'create_calendar_event',
+                success: calRes.ok,
+                id: calResult.id,
+                error: calRes.ok ? undefined : calResult.error?.message,
+              })
+            } catch (calErr) {
+              actionResults.push({ action: 'create_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
+            }
             break
           }
           case 'delete_memory': {

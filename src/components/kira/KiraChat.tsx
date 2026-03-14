@@ -216,6 +216,7 @@ export function KiraChat() {
       delete_meeting: 'Meeting cancelado',
       save_memory: 'Memoria guardada',
       delete_memory: 'Memoria eliminada',
+      create_calendar_event: 'Evento añadido a Google Calendar',
     }
     return labels[action] || action
   }

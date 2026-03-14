@@ -8,7 +8,7 @@ const PLANNED_AGENTS = [
   {
     name: 'Google Calendar',
     description: 'Crear, editar y consultar eventos del calendario',
-    status: 'planned' as const,
+    status: 'active' as const,
     icon: '📅',
   },
   {
@@ -113,7 +113,9 @@ export function KiraAgents() {
 
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
               <Plug className="h-3 w-3 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">MCP Server requerido</span>
+              <span className="text-[10px] text-muted-foreground">
+                {agent.status === 'active' ? 'Conectado via OAuth' : 'MCP Server requerido'}
+              </span>
             </div>
           </div>
         ))}
