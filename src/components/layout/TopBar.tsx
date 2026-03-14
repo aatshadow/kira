@@ -12,8 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 const navLinks = [
   { href: '/', label: 'Dashboard' },
-  { href: '/tasks', label: 'Tasks' },
-  { href: '/meetings', label: 'Meetings' },
+  { href: '/management', label: 'Management' },
   { href: '/kira', label: 'KIRA' },
   { href: '/analytics', label: 'Analytics' },
   { href: '/settings', label: 'Settings' },
