@@ -15,16 +15,16 @@ export function ActiveSession() {
 
   if (activeSession) {
     return (
-      <div className="rounded-lg border border-[rgba(0,212,255,0.25)] bg-card p-6 shadow-[0_0_40px_rgba(0,212,255,0.08)]">
+      <div className="rounded-xl border border-[rgba(0,212,255,0.25)] bg-card p-4 md:p-6 shadow-[0_0_40px_rgba(0,212,255,0.08)]">
         <div className="text-center">
-          <p className="text-xs text-muted-foreground mb-4 uppercase tracking-wider">
+          <p className="text-[10px] md:text-xs text-muted-foreground mb-3 md:mb-4 uppercase tracking-wider">
             Sesión activa
           </p>
-          <p className="kira-timer-glow active text-5xl font-light font-mono tracking-wider mb-4">
+          <p className="kira-timer-glow active text-4xl md:text-5xl font-light font-mono tracking-wider mb-3 md:mb-4">
             {formatTime(activeSession.elapsedSecs)}
           </p>
-          <p className="text-sm text-foreground mb-1">{activeSession.taskTitle}</p>
-          <p className="text-xs text-muted-foreground mb-4">
+          <p className="text-sm text-foreground mb-0.5 truncate max-w-full">{activeSession.taskTitle}</p>
+          <p className="text-xs text-muted-foreground mb-3 md:mb-4">
             {[activeSession.taskCategory, activeSession.taskProject].filter(Boolean).join(' · ')}
           </p>
           <Button variant="secondary" onClick={openTimerFloat}>
@@ -43,9 +43,9 @@ export function ActiveSession() {
     })[0]
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6">
+    <div className="rounded-xl border border-border bg-card p-4 md:p-6">
       <div className="text-center">
-        <p className="text-sm text-muted-foreground mb-4">Sin sesión activa</p>
+        <p className="text-sm text-muted-foreground mb-3 md:mb-4">Sin sesión activa</p>
         {nextTask ? (
           <>
             <div className="flex items-center justify-center gap-2 mb-4">

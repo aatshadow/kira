@@ -20,8 +20,8 @@ export function QuickBacklog() {
     .slice(0, 5)
 
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-xl border border-border bg-card p-4 md:p-5">
+      <div className="flex items-center justify-between mb-3 md:mb-4">
         <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Próximas
         </h3>
@@ -56,7 +56,7 @@ export function QuickBacklog() {
                   onClick={() =>
                     startTimer(task.id, task.title, cat?.name || '', proj?.name || '')
                   }
-                  className="opacity-0 group-hover:opacity-100 text-[#00D4FF] hover:text-[#00A8CC] transition-all cursor-pointer"
+                  className="md:opacity-0 md:group-hover:opacity-100 text-[#00D4FF] hover:text-[#00A8CC] transition-all cursor-pointer p-1"
                 >
                   <Play className="h-3.5 w-3.5" />
                 </button>

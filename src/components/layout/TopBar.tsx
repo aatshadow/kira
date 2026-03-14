@@ -62,7 +62,7 @@ export function TopBar() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 md:h-14 md:border-b md:border-border/50 md:bg-background/85 md:backdrop-blur-xl">
       {/* Mobile: floating pill header */}
-      <div className="md:hidden mx-3 mt-2">
+      <div className="md:hidden mx-3" style={{ marginTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
         <div className="flex h-12 items-center justify-between px-4 rounded-2xl border border-border/50 bg-background/90 backdrop-blur-xl shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
           {/* Logo */}
           <Link href="/" className="shrink-0 flex items-center gap-1.5">

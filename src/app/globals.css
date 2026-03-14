@@ -259,3 +259,18 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Prevent iOS text size adjust */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Smooth touch scrolling */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Disable tap highlight on iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
+}

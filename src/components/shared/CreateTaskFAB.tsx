@@ -32,7 +32,7 @@ export function CreateTaskFAB() {
   if (pathname.startsWith('/settings') || pathname.startsWith('/kira')) return null
 
   return (
-    <div ref={menuRef} className="fixed bottom-6 right-6 md:bottom-6 md:left-6 md:right-auto z-[150]">
+    <div ref={menuRef} className="fixed right-5 md:bottom-6 md:left-6 md:right-auto z-[150]" style={{ bottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
       {/* Expanded menu */}
       {menuOpen && (
         <div className="absolute bottom-16 right-0 md:left-0 md:right-auto flex flex-col gap-2 animate-kira-float-in">

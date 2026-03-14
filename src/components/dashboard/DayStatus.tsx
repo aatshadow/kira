@@ -111,15 +111,15 @@ export function DayStatus({ dailyGoalHours, calendarEventsMins = 0 }: DayStatusP
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6">
-      <div className="flex items-start justify-between mb-4">
+    <div className="rounded-xl border border-border bg-card p-4 md:p-6">
+      <div className="flex items-start justify-between mb-3 md:mb-4">
         <div>
-          <h2 className="text-xl font-bold text-foreground mb-1">{getGreeting()}, Alex</h2>
-          <p className="text-sm text-muted-foreground capitalize">{formatDate(today)}</p>
+          <h2 className="text-lg md:text-xl font-bold text-foreground mb-0.5">{getGreeting()}, Alex</h2>
+          <p className="text-xs md:text-sm text-muted-foreground capitalize">{formatDate(today)}</p>
         </div>
         <div className="text-right">
-          <p className="text-sm text-muted-foreground">Tasks completadas</p>
-          <p className="text-lg font-semibold text-foreground">
+          <p className="text-[11px] md:text-sm text-muted-foreground">Tasks</p>
+          <p className="text-base md:text-lg font-semibold text-foreground">
             {completedToday}
             <span className="text-muted-foreground font-normal">/{plannedToday}</span>
           </p>
@@ -127,26 +127,26 @@ export function DayStatus({ dailyGoalHours, calendarEventsMins = 0 }: DayStatusP
       </div>
 
       {/* Three time metrics */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="rounded-md bg-secondary/50 px-3 py-2">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Total</p>
-          <p className="text-sm font-semibold font-mono text-foreground">{fmtTime(totalWorkedMins)}</p>
+      <div className="grid grid-cols-3 gap-2 md:gap-3 mb-3 md:mb-4">
+        <div className="rounded-lg bg-[rgba(0,212,255,0.06)] border border-[rgba(0,212,255,0.1)] px-2.5 py-2 md:px-3">
+          <p className="text-[10px] md:text-[11px] text-[#00D4FF]/70 uppercase tracking-wider">Total</p>
+          <p className="text-sm md:text-base font-semibold font-mono text-[#00D4FF]">{fmtTime(totalWorkedMins)}</p>
         </div>
-        <div className="rounded-md bg-secondary/50 px-3 py-2">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Operativa</p>
-          <p className="text-sm font-semibold font-mono text-foreground">{fmtTime(operativaMins)}</p>
+        <div className="rounded-lg bg-secondary/50 px-2.5 py-2 md:px-3">
+          <p className="text-[10px] md:text-[11px] text-muted-foreground uppercase tracking-wider">Operativa</p>
+          <p className="text-sm md:text-base font-semibold font-mono text-foreground">{fmtTime(operativaMins)}</p>
         </div>
-        <div className="rounded-md bg-secondary/50 px-3 py-2">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Meetings</p>
-          <p className="text-sm font-semibold font-mono text-foreground">{fmtTime(meetingsMins)}</p>
+        <div className="rounded-lg bg-secondary/50 px-2.5 py-2 md:px-3">
+          <p className="text-[10px] md:text-[11px] text-muted-foreground uppercase tracking-wider">Meetings</p>
+          <p className="text-sm md:text-base font-semibold font-mono text-foreground">{fmtTime(meetingsMins)}</p>
         </div>
       </div>
 
       {/* Progress bar */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-muted-foreground">Progreso del día</span>
-          <span className="text-xs font-mono text-foreground">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] text-muted-foreground">Progreso del día</span>
+          <span className="text-[11px] font-mono text-foreground">
             {fmtTime(totalWorkedMins)} / {dailyGoalHours}h
           </span>
         </div>

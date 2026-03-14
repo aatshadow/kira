@@ -203,10 +203,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="py-4 md:py-8 space-y-4 md:space-y-6">
+    <div className="py-2 md:py-8 space-y-3 md:space-y-6">
       <DayStatus dailyGoalHours={8} calendarEventsMins={calendarEventsMinsToday} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
         <div className="lg:col-span-2">
           <ActiveSession />
         </div>
@@ -215,9 +215,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-6">
         {/* Completed today */}
-        <div className="rounded-lg border border-border bg-card p-5">
+        <div className="rounded-xl border border-border bg-card p-4 md:p-5">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
             Completadas hoy
           </h3>
@@ -240,7 +240,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Next 3 meetings */}
-        <div className="rounded-lg border border-border bg-card p-5">
+        <div className="rounded-xl border border-border bg-card p-4 md:p-5">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
             Próximos meetings
           </h3>
@@ -279,7 +279,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Daily summary */}
-      <div className="rounded-lg border border-border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-4 md:p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Resumen del día

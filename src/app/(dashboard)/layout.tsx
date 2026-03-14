@@ -43,7 +43,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
-      <main className="pt-16 md:pt-14 px-4 md:px-6 lg:px-10 pb-20 max-w-[1400px] mx-auto">
+      <main className="pt-[calc(4rem+env(safe-area-inset-top))] md:pt-14 px-[max(1rem,env(safe-area-inset-left))] md:px-6 lg:px-10 pb-[calc(5rem+env(safe-area-inset-bottom))] max-w-[1400px] mx-auto">
         {children}
       </main>
 
