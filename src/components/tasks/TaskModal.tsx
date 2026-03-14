@@ -104,7 +104,7 @@ export function TaskModal() {
 
       // Switch to manual mode so user can review
       setMode('manual')
-    } catch {
+    } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Error al procesar el texto. Inténtalo de nuevo.')
     } finally {
       setAiLoading(false)
