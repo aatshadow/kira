@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { createClient } from '@/lib/supabase/client'
+import { IS_DEMO } from '@/lib/demo'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -17,18 +19,28 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    // Demo mode: accept any credentials
     if (!email || !password) {
       setError('Introduce email y contraseña')
       setLoading(false)
       return
     }
 
-    // Set demo session cookie
-    document.cookie = 'kira_session=active; path=/; max-age=604800; SameSite=Lax'
+    if (IS_DEMO) {
+      document.cookie = 'kira_session=active; path=/; max-age=604800; SameSite=Lax'
+      await new Promise((r) => setTimeout(r, 400))
+      router.push('/')
+      router.refresh()
+      return
+    }
 
-    // Small delay for UX feel
-    await new Promise((r) => setTimeout(r, 400))
+    const supabase = createClient()
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (authError) {
+      setError(authError.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos' : authError.message)
+      setLoading(false)
+      return
+    }
 
     router.push('/')
     router.refresh()
