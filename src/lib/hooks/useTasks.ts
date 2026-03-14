@@ -47,12 +47,18 @@ export function useTasks() {
       }
 
       const supabase = createClient()
+      console.log('[KIRA] fetchAll: starting queries...')
       const [tasksRes, catsRes, projsRes, tagsRes] = await Promise.all([
         supabase.from('tasks').select('*').neq('status', 'deleted').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
         supabase.from('categories').select('*').order('is_default', { ascending: false }),
         supabase.from('projects').select('*').eq('is_archived', false).order('name'),
         supabase.from('tags').select('*').order('name'),
       ])
+
+      console.log('[KIRA] tasks:', tasksRes.data?.length, tasksRes.error)
+      console.log('[KIRA] categories:', catsRes.data?.length, catsRes.error)
+      console.log('[KIRA] projects:', projsRes.data?.length, projsRes.error)
+      console.log('[KIRA] tags:', tagsRes.data?.length, tagsRes.error)
 
       if (tasksRes.data) setTasks(tasksRes.data)
       if (catsRes.data) setCategories(catsRes.data)
