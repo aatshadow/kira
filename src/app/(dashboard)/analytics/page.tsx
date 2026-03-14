@@ -272,6 +272,8 @@ function OverviewTab({ data }: { data: AnalyticsData }) {
   const [summaryText, setSummaryText] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
 
+  const periodMap = { diario: 'daily', semanal: 'weekly', mensual: 'monthly' } as const
+
   async function requestSummary(type: 'diario' | 'semanal' | 'mensual') {
     setSummaryType(type)
     setSummaryLoading(true)
@@ -280,7 +282,7 @@ function OverviewTab({ data }: { data: AnalyticsData }) {
       const res = await fetch('/api/ai/summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, data }),
+        body: JSON.stringify({ period: periodMap[type] }),
       })
       if (res.ok) {
         const json = await res.json()
