@@ -14,8 +14,7 @@ export interface MeetingRecord {
   status: string
   duration_mins: number | null
   scheduled_at: string
-  completed_at: string | null
-  participants: unknown[] | null
+  participants: string | null
 }
 
 export interface HabitRecord {
@@ -28,8 +27,8 @@ export interface HabitRecord {
 export interface HabitLogRecord {
   id: string
   habit_id: string
-  logged_at: string
-  completed: boolean
+  completed_at: string
+  duration_mins: number | null
 }
 
 export interface TaskRecord {
@@ -187,8 +186,8 @@ export function useAnalytics() {
       supabase!.from('meetings').select('*').order('scheduled_at', { ascending: false }),
       supabase!.from('habits').select('*'),
       supabase!.from('habit_logs').select('*')
-        .gte('logged_at', from.toISOString())
-        .lte('logged_at', to.toISOString()),
+        .gte('completed_at', from.toISOString())
+        .lte('completed_at', to.toISOString()),
     ])
 
     const sessions = sessionsRes.data || []
@@ -330,7 +329,7 @@ export function useAnalytics() {
       : null
 
     const meetingsWithParticipants = meetingsInRange.filter(m =>
-      m.participants && Array.isArray(m.participants) && m.participants.length > 0
+      m.participants && m.participants.trim().length > 0
     ).length
     const meetingsSolo = meetingsInRange.length - meetingsWithParticipants
 
@@ -364,9 +363,9 @@ export function useAnalytics() {
 
     /* ---- HABITS ---- */
     const todayStr = format(now, 'yyyy-MM-dd')
-    const completedHabitLogs = habitLogs.filter(l => l.completed)
+    const completedHabitLogs = habitLogs
     const habitsCompletedToday = completedHabitLogs.filter(l =>
-      format(new Date(l.logged_at), 'yyyy-MM-dd') === todayStr
+      format(new Date(l.completed_at), 'yyyy-MM-dd') === todayStr
     ).length
 
     const daysInRange = eachDayOfInterval({ start: from, end: to > now ? now : to }).length
@@ -376,13 +375,13 @@ export function useAnalytics() {
       : null
 
     const habitCompletionRates = habits.map(h => {
-      const logs = habitLogs.filter(l => l.habit_id === h.id && l.completed)
+      const logs = habitLogs.filter(l => l.habit_id === h.id)
       const rate = daysInRange > 0 ? Math.round((logs.length / daysInRange) * 100) : 0
 
       let streak = 0
       const allCompletedDates = habitLogs
-        .filter(l => l.habit_id === h.id && l.completed)
-        .map(l => format(new Date(l.logged_at), 'yyyy-MM-dd'))
+        .filter(l => l.habit_id === h.id)
+        .map(l => format(new Date(l.completed_at), 'yyyy-MM-dd'))
         .sort()
         .reverse()
 

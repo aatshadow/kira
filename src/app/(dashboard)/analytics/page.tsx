@@ -212,8 +212,8 @@ function HabitWeeklyHeatmap({ habitCompletionRates, habitLogs }: {
   return (
     <div className="space-y-3">
       {habitCompletionRates.map(habit => {
-        const logs = habitLogs.filter(l => l.habit_id === habit.habitId && l.completed)
-        const logDays = logs.map(l => new Date(l.logged_at).getDay())
+        const logs = habitLogs.filter(l => l.habit_id === habit.habitId)
+        const logDays = logs.map(l => new Date(l.completed_at).getDay())
         // Convert JS day (0=Sun) to Mon-based index
         const dayPresence = dayLabels.map((_, i) => {
           const jsDay = i === 6 ? 0 : i + 1
@@ -624,9 +624,9 @@ function MeetingsTab({ data }: { data: AnalyticsData }) {
                     })}
                   </p>
                 </div>
-                {m.participants && Array.isArray(m.participants) && m.participants.length > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    <Users className="inline h-3 w-3 mr-1" />{m.participants.length}
+                {m.participants && (
+                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                    <Users className="inline h-3 w-3 mr-1" />{m.participants}
                   </span>
                 )}
               </div>
