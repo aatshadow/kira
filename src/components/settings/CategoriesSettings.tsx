@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useTaskStore } from '@/stores/taskStore'
 import { createClient } from '@/lib/supabase/client'
+import { getUserId } from '@/lib/supabase/getUserId'
 import { IS_DEMO, demoId } from '@/lib/demo'
 
 export function CategoriesSettings() {
@@ -21,7 +22,8 @@ export function CategoriesSettings() {
       setNewName('')
       return
     }
-    const { data } = await supabase!.from('categories').insert({ name: newName.trim() }).select().single()
+    const userId = await getUserId()
+    const { data } = await supabase!.from('categories').insert({ name: newName.trim(), user_id: userId }).select().single()
     if (data) {
       addCategory(data)
       setNewName('')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useUser } from '@/lib/hooks/useUser'
 import { TopBar } from '@/components/layout/TopBar'
 import { TimerFloat } from '@/components/layout/TimerFloat'
 import { TaskModal } from '@/components/tasks/TaskModal'
@@ -16,6 +17,9 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const { openModal } = useUIStore()
+
+  // Ensure profile exists on first load
+  useUser()
 
   // Keyboard shortcut: C to create task
   useEffect(() => {

@@ -1,17 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useUser } from '@/lib/hooks/useUser'
 
 export function ProfileSettings() {
-  const [name, setName] = useState('Alex')
+  const { user, updateProfile } = useUser()
+  const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (user?.name) setName(user.name)
+  }, [user?.name])
 
   const handleSave = async () => {
     setSaving(true)
-    setTimeout(() => setSaving(false), 500)
+    await updateProfile({ name })
+    setSaving(false)
   }
 
   return (
@@ -24,7 +31,7 @@ export function ProfileSettings() {
         </div>
         <div>
           <Label className="text-xs text-muted-foreground mb-1.5 block">Email</Label>
-          <Input value="alex@blackwolf.com" disabled className="max-w-sm bg-secondary opacity-60" />
+          <Input value={user?.email || ''} disabled className="max-w-sm bg-secondary opacity-60" />
         </div>
         <Button onClick={handleSave} disabled={saving} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC]">
           {saving ? 'Guardando...' : 'Guardar cambios'}

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { useUser } from '@/lib/hooks/useUser'
 
 const weekDays = [
   { id: 1, label: 'Lun' },
@@ -17,13 +18,32 @@ const weekDays = [
 ]
 
 export function GoalsSettings() {
+  const { user, updateProfile } = useUser()
   const [dailyGoal, setDailyGoal] = useState('8')
   const [weeklyGoal, setWeeklyGoal] = useState('40')
   const [workDays, setWorkDays] = useState([1, 2, 3, 4, 5])
   const [saving, setSaving] = useState(false)
 
+  useEffect(() => {
+    if (user) {
+      setDailyGoal(String(user.daily_goal_hours))
+      setWeeklyGoal(String(user.weekly_goal_hours))
+      setWorkDays(user.work_days)
+    }
+  }, [user])
+
   const toggleDay = (day: number) => {
     setWorkDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    await updateProfile({
+      daily_goal_hours: Number(dailyGoal),
+      weekly_goal_hours: Number(weeklyGoal),
+      work_days: workDays,
+    })
+    setSaving(false)
   }
 
   return (
@@ -59,7 +79,7 @@ export function GoalsSettings() {
             ))}
           </div>
         </div>
-        <Button onClick={() => { setSaving(true); setTimeout(() => setSaving(false), 500) }} disabled={saving} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC]">
+        <Button onClick={handleSave} disabled={saving} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC]">
           {saving ? 'Guardando...' : 'Guardar'}
         </Button>
       </div>

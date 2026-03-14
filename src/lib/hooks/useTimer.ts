@@ -4,6 +4,7 @@ import { useEffect, useCallback } from 'react'
 import { useTimerStore } from '@/stores/timerStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { createClient } from '@/lib/supabase/client'
+import { getUserId } from '@/lib/supabase/getUserId'
 import { IS_DEMO, demoId } from '@/lib/demo'
 import type { ActiveTimer } from '@/types/timer'
 
@@ -53,7 +54,8 @@ export function useTimer() {
       if (IS_DEMO) {
         sessionId = demoId()
       } else {
-        const { data, error } = await supabase!.from('timer_sessions').insert({ task_id: taskId, started_at: new Date().toISOString(), status: 'running' }).select().single()
+        const userId = await getUserId()
+        const { data, error } = await supabase!.from('timer_sessions').insert({ task_id: taskId, user_id: userId, started_at: new Date().toISOString(), status: 'running' }).select().single()
         if (error || !data) return
         sessionId = data.id
         await supabase!.from('tasks').update({ status: 'in_progress', updated_at: new Date().toISOString() }).eq('id', taskId)

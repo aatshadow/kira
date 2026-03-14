@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from 'react'
 import { useTaskStore } from '@/stores/taskStore'
 import { createClient } from '@/lib/supabase/client'
+import { getUserId } from '@/lib/supabase/getUserId'
 import { IS_DEMO, demoId } from '@/lib/demo'
 import type { Task } from '@/types/task'
 
@@ -108,7 +109,8 @@ export function useTasks() {
         return task
       }
 
-      const { data: task, error } = await supabase!.from('tasks').insert(data).select().single()
+      const userId = await getUserId()
+      const { data: task, error } = await supabase!.from('tasks').insert({ ...data, user_id: userId }).select().single()
       if (error || !task) return null
       addTask(task)
       return task

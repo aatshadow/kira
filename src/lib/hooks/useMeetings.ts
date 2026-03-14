@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from 'react'
 import { useMeetingStore } from '@/stores/meetingStore'
 import { createClient } from '@/lib/supabase/client'
+import { getUserId } from '@/lib/supabase/getUserId'
 import { IS_DEMO, demoId } from '@/lib/demo'
 import type { Meeting } from '@/types/meeting'
 
@@ -60,7 +61,8 @@ export function useMeetings() {
         return meeting
       }
 
-      const { data: meeting, error } = await supabase!.from('meetings').insert(data).select().single()
+      const userId = await getUserId()
+      const { data: meeting, error } = await supabase!.from('meetings').insert({ ...data, user_id: userId }).select().single()
       if (error || !meeting) return null
       addMeeting(meeting)
       return meeting
