@@ -1,22 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
-async function getGoogleToken(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
-  // First try to get from the current session
-  const { data: { session } } = await supabase.auth.getSession()
-  if (session?.provider_token) {
-    return session.provider_token
-  }
-
-  // Fallback to stored token
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('google_access_token')
-    .eq('id', userId)
-    .single()
-
-  return profile?.google_access_token || null
-}
+import { getValidGoogleToken } from '@/lib/google'
 
 // GET — list calendar events
 export async function GET(request: NextRequest) {
@@ -26,7 +10,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const token = await getGoogleToken(supabase, user.id)
+  const token = await getValidGoogleToken(supabase, user.id)
   if (!token) {
     return NextResponse.json({ error: 'Google Calendar not connected' }, { status: 403 })
   }
@@ -83,7 +67,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const token = await getGoogleToken(supabase, user.id)
+  const token = await getValidGoogleToken(supabase, user.id)
   if (!token) {
     return NextResponse.json({ error: 'Google Calendar not connected' }, { status: 403 })
   }

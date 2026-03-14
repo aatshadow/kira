@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { getValidGoogleToken } from '@/lib/google'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -61,8 +62,7 @@ export async function POST(request: NextRequest) {
 
   // --- Load Google Calendar events ---
   let calendarEventsText = '(Google Calendar no conectado)'
-  const { data: { session } } = await supabase.auth.getSession()
-  const googleToken = session?.provider_token || null
+  const googleToken = await getValidGoogleToken(supabase, user.id)
 
   if (googleToken) {
     try {
