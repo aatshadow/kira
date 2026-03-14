@@ -20,10 +20,11 @@ export default function KiraPage() {
   const [activeTab, setActiveTab] = useState<TabId>('chat')
 
   return (
-    <div className="py-8 flex flex-col" style={{ height: 'calc(100vh - 3.5rem - 5rem)' }}>
+    <div className="py-2 md:py-8 flex flex-col" style={{ height: 'calc(100vh - 4.5rem)' }}>
       {/* Header with tabs */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-3 md:mb-4">
+        {/* Title - hidden on mobile since TopBar already shows KIRA */}
+        <div className="hidden md:flex items-center gap-2">
           <Image src="/logo.png" alt="KIRA" width={32} height={32} className="rounded-full" />
           <div>
             <h1 className="text-lg font-bold text-foreground">KIRA</h1>
@@ -31,8 +32,8 @@ export default function KiraPage() {
           </div>
         </div>
 
-        {/* Tab bar */}
-        <div className="flex items-center gap-1 p-1 bg-secondary rounded-lg">
+        {/* Tab bar - full width on mobile */}
+        <div className="flex items-center gap-1 p-1 bg-secondary rounded-lg w-full md:w-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon
             return (
@@ -40,7 +41,7 @@ export default function KiraPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer',
+                  'flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer',
                   activeTab === tab.id
                     ? 'bg-background text-[#00D4FF] shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'

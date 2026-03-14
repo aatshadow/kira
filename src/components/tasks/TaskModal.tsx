@@ -46,8 +46,9 @@ export function TaskModal() {
       setMode('manual')
       setTitle(existingTask.title)
       setDescription(existingTask.description || '')
-      setCategoryId(existingTask.category_id || '')
-      setProjectId(existingTask.project_id || '')
+      // Only set if ID exists in available options
+      setCategoryId(categories.some(c => c.id === existingTask.category_id) ? existingTask.category_id || '' : '')
+      setProjectId(projects.some(p => p.id === existingTask.project_id) ? existingTask.project_id || '' : '')
       setPriority(existingTask.priority)
       setEstimatedMins(existingTask.estimated_mins?.toString() || '')
       setDueDate(existingTask.due_date || '')
@@ -68,7 +69,8 @@ export function TaskModal() {
       setAiError('')
     }
     setError('')
-  }, [isOpen, isEdit, existingTask, modalData?.mode])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isEdit, existingTask, modalData?.mode, categories, projects])
 
   const handleAiParse = async () => {
     if (!aiText.trim()) return
@@ -94,8 +96,8 @@ export function TaskModal() {
       // Fill form fields with AI result
       setTitle(data.title || '')
       setDescription(data.description || '')
-      setCategoryId(data.category_id || '')
-      setProjectId(data.project_id || '')
+      setCategoryId(categories.some(c => c.id === data.category_id) ? data.category_id || '' : '')
+      setProjectId(projects.some(p => p.id === data.project_id) ? data.project_id || '' : '')
       setPriority(data.priority || null)
       setEstimatedMins(data.estimated_mins?.toString() || '')
       setDueDate(data.due_date || '')
@@ -145,7 +147,7 @@ export function TaskModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
-      <DialogContent className="sm:max-w-[520px] bg-card border-border animate-kira-modal-in max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[520px] bg-card border-border animate-kira-modal-in max-h-[90vh] overflow-y-auto [&>button]:top-3 [&>button]:right-3">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             {isEdit ? 'Editar task' : 'Nueva task'}

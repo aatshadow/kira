@@ -171,7 +171,7 @@ export default function HabitsPage() {
             return (
               <div
                 key={habit.id}
-                className="rounded-lg border border-border bg-card p-4 hover:border-border/80 transition-colors"
+                className="group rounded-lg border border-border bg-card p-3 md:p-4 hover:border-border/80 transition-colors"
               >
                 <div className="flex items-center gap-4">
                   {/* Check button */}
@@ -233,7 +233,7 @@ export default function HabitsPage() {
                   {/* Delete */}
                   <button
                     onClick={() => deleteHabit(habit.id)}
-                    className="p-1.5 rounded hover:bg-destructive/20 transition-colors cursor-pointer opacity-0 hover:opacity-100"
+                    className="p-1.5 rounded hover:bg-destructive/20 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                   </button>

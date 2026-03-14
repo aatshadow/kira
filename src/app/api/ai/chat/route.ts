@@ -177,7 +177,7 @@ You can execute actions by including JSON action blocks in your response:
 
 \`\`\`kira-action
 {
-  "action": "create_task" | "edit_task" | "delete_task" | "create_meeting" | "edit_meeting" | "delete_meeting" | "save_memory" | "delete_memory" | "create_calendar_event" | "update_calendar_event" | "delete_calendar_event",
+  "action": "create_task" | "edit_task" | "delete_task" | "create_meeting" | "edit_meeting" | "delete_meeting" | "save_memory" | "delete_memory" | "create_calendar_event" | "update_calendar_event" | "delete_calendar_event" | "create_category" | "create_project",
   "data": { ... }
 }
 \`\`\`
@@ -217,6 +217,12 @@ You can execute actions by including JSON action blocks in your response:
 **delete_calendar_event** (delete/cancel a Google Calendar event):
 { "event_id": "gcal_id", "send_notifications": "boolean (true to notify attendees, default true)" }
 
+**create_category** (create a new task category):
+{ "name": "string" }
+
+**create_project** (create a new project):
+{ "name": "string", "description": "string|null" }
+
 ## Priority Matrix (Eisenhower):
 - q1: Urgente + Importante
 - q2: Importante, No Urgente
@@ -239,7 +245,8 @@ You can execute actions by including JSON action blocks in your response:
 13. Never show raw IDs to the user. Use names instead.
 14. For Google Calendar: you can create, update, and delete events. You can add/remove attendees, add Google Meet video calls, change times, descriptions, and locations. Use the gcal_id shown in the calendar events list to reference existing events.
 15. When the user asks to add a Meet link or video call to an event, use add_meet: true.
-16. When analyzing the calendar, provide insights about schedule density, conflicts, free slots, and meeting patterns.`
+16. When analyzing the calendar, provide insights about schedule density, conflicts, free slots, and meeting patterns.
+17. When the user mentions a category or project that doesn't exist yet, create it first with create_category or create_project, then use the returned ID for the task.`
 
   try {
     const anthropicMessages = messages.map((m: ChatMessage) => ({
@@ -498,6 +505,34 @@ You can execute actions by including JSON action blocks in your response:
             } catch (calErr) {
               actionResults.push({ action: 'delete_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
             }
+            break
+          }
+          case 'create_category': {
+            const { name } = act.data as { name: string }
+            if (!name) {
+              actionResults.push({ action: 'create_category', success: false, error: 'Missing name' })
+              break
+            }
+            const { data: cat, error } = await supabase
+              .from('categories')
+              .insert({ user_id: user.id, name })
+              .select()
+              .single()
+            actionResults.push({ action: 'create_category', success: !error, id: cat?.id, error: error?.message })
+            break
+          }
+          case 'create_project': {
+            const projData = act.data as { name: string; description?: string }
+            if (!projData.name) {
+              actionResults.push({ action: 'create_project', success: false, error: 'Missing name' })
+              break
+            }
+            const { data: proj, error } = await supabase
+              .from('projects')
+              .insert({ user_id: user.id, name: projData.name, description: projData.description || null })
+              .select()
+              .single()
+            actionResults.push({ action: 'create_project', success: !error, id: proj?.id, error: error?.message })
             break
           }
           case 'delete_memory': {

@@ -51,7 +51,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="py-8 space-y-6">
+    <div className="py-4 md:py-8 space-y-4 md:space-y-6">
       {/* Top row */}
       <DayStatus totalWorkedMins={0} dailyGoalHours={8} />
 
