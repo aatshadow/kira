@@ -294,12 +294,16 @@ You can execute actions by including JSON action blocks in your response:
     }
 
     // Extract actions from response
+    // Claude may output { action, data: {...} } or flat { action, ...fields }
     const actions: Array<{ action: string; data: Record<string, unknown> }> = []
     const actionRegex = /```kira-action\n([\s\S]*?)```/g
     let match
     while ((match = actionRegex.exec(content.text)) !== null) {
       try {
-        actions.push(JSON.parse(match[1]))
+        const parsed = JSON.parse(match[1])
+        const { action, data, ...rest } = parsed
+        // Normalize: if no data wrapper, treat remaining fields as data
+        actions.push({ action, data: data || rest })
       } catch {
         // skip malformed actions
       }
