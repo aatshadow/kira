@@ -33,6 +33,48 @@ function persistDemo() {
   localStorage.setItem('kira_demo_meetings', JSON.stringify(useMeetingStore.getState().meetings))
 }
 
+// --- Google Calendar helpers (fire-and-forget, non-blocking) ---
+
+async function syncToGoogleCalendar(meeting: Meeting): Promise<string | null> {
+  if (!meeting.scheduled_at) return null
+  try {
+    const end = meeting.duration_mins
+      ? new Date(new Date(meeting.scheduled_at).getTime() + meeting.duration_mins * 60000).toISOString()
+      : undefined
+
+    const res = await fetch('/api/calendar/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: meeting.title,
+        start: meeting.scheduled_at,
+        end,
+        description: meeting.pre_notes || undefined,
+      }),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      return data.id || null // Google Calendar event ID
+    }
+  } catch {
+    // Calendar not connected or error — skip silently
+  }
+  return null
+}
+
+async function deleteFromGoogleCalendar(calendarEventId: string): Promise<void> {
+  try {
+    await fetch('/api/calendar/events', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: calendarEventId }),
+    })
+  } catch {
+    // Skip silently
+  }
+}
+
 export function useMeetings() {
   const meetings = useMeetingStore((s) => s.meetings)
   const loading = useMeetingStore((s) => s.loading)
@@ -72,6 +114,14 @@ export function useMeetings() {
     const { data: meeting, error } = await supabase.from('meetings').insert({ ...data, user_id: userId }).select().single()
     if (error || !meeting) return null
     useMeetingStore.getState().addMeeting(meeting)
+
+    // Sync to Google Calendar
+    const gcalId = await syncToGoogleCalendar(meeting)
+    if (gcalId) {
+      await supabase.from('meetings').update({ calendar_event_id: gcalId }).eq('id', meeting.id)
+      useMeetingStore.getState().updateMeeting(meeting.id, { calendar_event_id: gcalId })
+    }
+
     return meeting
   }
 
@@ -92,6 +142,12 @@ export function useMeetings() {
       useMeetingStore.getState().removeMeeting(id)
       setTimeout(persistDemo, 0)
       return
+    }
+
+    // Delete from Google Calendar if linked
+    const meeting = useMeetingStore.getState().meetings.find(m => m.id === id)
+    if (meeting?.calendar_event_id) {
+      deleteFromGoogleCalendar(meeting.calendar_event_id)
     }
 
     const supabase = createClient()

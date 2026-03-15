@@ -59,6 +59,45 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// DELETE — delete a calendar event
+export async function DELETE(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const token = await getValidGoogleToken(supabase, user.id)
+  if (!token) {
+    return NextResponse.json({ error: 'Google Calendar not connected' }, { status: 403 })
+  }
+
+  const { eventId } = await request.json()
+  if (!eventId) {
+    return NextResponse.json({ error: 'eventId required' }, { status: 400 })
+  }
+
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    )
+
+    if (res.status === 204 || res.ok) {
+      return NextResponse.json({ success: true })
+    }
+
+    const err = await res.json()
+    return NextResponse.json({ error: 'Failed to delete event', details: err.error?.message }, { status: res.status })
+  } catch (err) {
+    console.error('[KIRA] Google Calendar delete error:', err)
+    return NextResponse.json({ error: 'Failed to delete event' }, { status: 500 })
+  }
+}
+
 // POST — create a calendar event
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
