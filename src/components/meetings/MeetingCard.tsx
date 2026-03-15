@@ -17,6 +17,7 @@ interface MeetingCardProps {
   onEdit: (meeting: Meeting) => void
   onComplete: (meeting: Meeting) => void
   onCancel: (meeting: Meeting) => void
+  onDelete: (meeting: Meeting) => void
 }
 
 const statusColors: Record<string, string> = {
@@ -33,7 +34,7 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelado',
 }
 
-export function MeetingCard({ meeting, onEdit, onComplete, onCancel }: MeetingCardProps) {
+export function MeetingCard({ meeting, onEdit, onComplete, onCancel, onDelete }: MeetingCardProps) {
   return (
     <div
       className="group flex items-center gap-4 p-4 rounded-lg border border-border hover:border-muted-foreground/30 bg-card transition-all cursor-pointer"
@@ -83,23 +84,26 @@ export function MeetingCard({ meeting, onEdit, onComplete, onCancel }: MeetingCa
 
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity cursor-pointer"
+          className="p-1 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity cursor-pointer"
           onClick={(e) => e.stopPropagation()}
         >
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => onEdit(meeting)}>Editar</DropdownMenuItem>
-          {meeting.status === 'scheduled' && (
+          {(meeting.status === 'scheduled' || meeting.status === 'in_progress') && (
             <DropdownMenuItem onClick={() => onComplete(meeting)}>
               Marcar completado
             </DropdownMenuItem>
           )}
-          {meeting.status !== 'cancelled' && (
+          {meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
             <DropdownMenuItem onClick={() => onCancel(meeting)} className="text-destructive">
               Cancelar
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onClick={() => onDelete(meeting)} className="text-destructive">
+            Eliminar
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

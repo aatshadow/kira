@@ -7,13 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MeetingCard } from '@/components/meetings/MeetingCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useMeetings } from '@/lib/hooks/useMeetings'
-import { useTasks } from '@/lib/hooks/useTasks'
 import { useUIStore } from '@/stores/uiStore'
 import type { Meeting } from '@/types/meeting'
 
 export default function ManagementMeetingsPage() {
-  const { meetings, editMeeting } = useMeetings()
-  const { createTask } = useTasks()
+  const { meetings, editMeeting, deleteMeeting } = useMeetings()
   const { openModal } = useUIStore()
   const [tab, setTab] = useState('upcoming')
 
@@ -24,18 +22,10 @@ export default function ManagementMeetingsPage() {
   const handleEdit = (meeting: Meeting) => openModal('meeting-edit', { meeting })
   const handleComplete = async (meeting: Meeting) => {
     await editMeeting(meeting.id, { status: 'completed' })
-    // Auto-create transcription task linked to this meeting
-    await createTask({
-      title: `📝 Transcripción: ${meeting.title}`,
-      description: `Pega la transcripción del meeting "${meeting.title}" en las notas de este meeting.`,
-      priority: 'q2',
-      status: 'todo',
-      meeting_id: meeting.id,
-      due_date: new Date().toISOString().split('T')[0],
-    })
     openModal('meeting-edit', { meeting: { ...meeting, status: 'completed' } })
   }
   const handleCancel = async (meeting: Meeting) => await editMeeting(meeting.id, { status: 'cancelled' })
+  const handleDelete = async (meeting: Meeting) => await deleteMeeting(meeting.id)
 
   return (
     <div>
@@ -56,13 +46,13 @@ export default function ManagementMeetingsPage() {
             <TabsTrigger value="cancelled">Cancelados ({cancelled.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="upcoming" className="space-y-2">
-            {upcoming.length === 0 ? <p className="text-sm text-muted-foreground py-4">No hay meetings próximos</p> : upcoming.map((m) => <MeetingCard key={m.id} meeting={m} onEdit={handleEdit} onComplete={handleComplete} onCancel={handleCancel} />)}
+            {upcoming.length === 0 ? <p className="text-sm text-muted-foreground py-4">No hay meetings próximos</p> : upcoming.map((m) => <MeetingCard key={m.id} meeting={m} onEdit={handleEdit} onComplete={handleComplete} onCancel={handleCancel} onDelete={handleDelete} />)}
           </TabsContent>
           <TabsContent value="completed" className="space-y-2">
-            {completed.length === 0 ? <p className="text-sm text-muted-foreground py-4">No hay meetings completados</p> : completed.map((m) => <MeetingCard key={m.id} meeting={m} onEdit={handleEdit} onComplete={handleComplete} onCancel={handleCancel} />)}
+            {completed.length === 0 ? <p className="text-sm text-muted-foreground py-4">No hay meetings completados</p> : completed.map((m) => <MeetingCard key={m.id} meeting={m} onEdit={handleEdit} onComplete={handleComplete} onCancel={handleCancel} onDelete={handleDelete} />)}
           </TabsContent>
           <TabsContent value="cancelled" className="space-y-2">
-            {cancelled.length === 0 ? <p className="text-sm text-muted-foreground py-4">No hay meetings cancelados</p> : cancelled.map((m) => <MeetingCard key={m.id} meeting={m} onEdit={handleEdit} onComplete={handleComplete} onCancel={handleCancel} />)}
+            {cancelled.length === 0 ? <p className="text-sm text-muted-foreground py-4">No hay meetings cancelados</p> : cancelled.map((m) => <MeetingCard key={m.id} meeting={m} onEdit={handleEdit} onComplete={handleComplete} onCancel={handleCancel} onDelete={handleDelete} />)}
           </TabsContent>
         </Tabs>
       )}

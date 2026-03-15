@@ -117,7 +117,7 @@ export function TaskCard({ task, variant = 'list' }: TaskCardProps) {
               e.stopPropagation()
               handleStart()
             }}
-            className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-[#00D4FF] hover:text-[#00A8CC] transition-all cursor-pointer"
+            className="absolute top-4 right-4 sm:opacity-0 sm:group-hover:opacity-100 text-[#00D4FF] hover:text-[#00A8CC] transition-all cursor-pointer"
           >
             <Play className="h-4 w-4" />
           </button>
@@ -168,7 +168,7 @@ export function TaskCard({ task, variant = 'list' }: TaskCardProps) {
       </Badge>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         {task.status !== 'done' && task.status !== 'deleted' && (
           <button
             onClick={handleStart}

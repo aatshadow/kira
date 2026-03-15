@@ -27,9 +27,18 @@ export default function ManagementTasksPage() {
   const { tasks, categories, projects, view, filters, setView, setFilter } = useTaskStore()
   const { openModal } = useUIStore()
 
+  const today = new Date().toISOString().split('T')[0]
+
   const filteredTasks = useMemo(() => {
     let result = tasks.filter((t) => t.status !== 'deleted')
-    if (filters.status.length > 0) result = result.filter((t) => filters.status.includes(t.status))
+    if (filters.status.length > 0) {
+      if (filters.status.includes('overdue')) {
+        // Special filter: overdue = past due_date + not done
+        result = result.filter((t) => t.due_date && t.due_date < today && t.status !== 'done')
+      } else {
+        result = result.filter((t) => filters.status.includes(t.status))
+      }
+    }
     if (filters.category.length > 0) result = result.filter((t) => t.category_id && filters.category.includes(t.category_id))
     if (filters.project) result = result.filter((t) => t.project_id === filters.project)
     if (filters.priority.length > 0) result = result.filter((t) => t.priority && filters.priority.includes(t.priority))
@@ -38,7 +47,11 @@ export default function ManagementTasksPage() {
       result = result.filter((t) => t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.tags?.some((tag) => tag.toLowerCase().includes(q)))
     }
     return result
-  }, [tasks, filters])
+  }, [tasks, filters, today])
+
+  const overdueCount = useMemo(() =>
+    tasks.filter((t) => t.status !== 'deleted' && t.status !== 'done' && t.due_date && t.due_date < today).length
+  , [tasks, today])
 
   const renderGroupedView = (groupBy: 'category' | 'project') => {
     const groups = groupBy === 'category'
@@ -94,6 +107,7 @@ export default function ManagementTasksPage() {
           <SelectTrigger className="w-[130px] h-9 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="overdue">Pasadas ({overdueCount})</SelectItem>
             <SelectItem value="backlog">Backlog</SelectItem>
             <SelectItem value="todo">To Do</SelectItem>
             <SelectItem value="in_progress">In Progress</SelectItem>
