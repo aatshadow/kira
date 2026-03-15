@@ -43,10 +43,11 @@ export async function POST(request: NextRequest) {
       .eq('status', 'completed')
       .gte('started_at', from.toISOString())
       .lte('started_at', to.toISOString()),
-    supabase.from('tasks').select('*'),
+    supabase.from('tasks').select('*').eq('user_id', user.id),
     supabase
       .from('meetings')
       .select('*')
+      .eq('user_id', user.id)
       .gte('scheduled_at', from.toISOString())
       .lte('scheduled_at', to.toISOString()),
     supabase.from('habits').select('*').eq('user_id', user.id),
@@ -164,6 +165,18 @@ Completados en el período: ${habitsCompleted} de ${habitsTotal} hábitos
       },
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id,period' })
+
+    // Trigger profile regeneration in background on daily summaries
+    if (period === 'daily') {
+      const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
+      const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
+      fetch(`${baseUrl}/api/ai/profile`, {
+        method: 'POST',
+        headers: {
+          cookie: request.headers.get('cookie') || '',
+        },
+      }).catch(() => { /* fire and forget */ })
+    }
 
     return NextResponse.json({
       summary: content.text,

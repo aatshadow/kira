@@ -111,6 +111,17 @@ export async function POST(request: NextRequest) {
     ? memories.map(m => `[${m.category}] ${m.content}`).join('\n')
     : '(no memories yet)'
 
+  // --- Load AI-generated user profile ---
+  const { data: profileAi } = await supabase
+    .from('user_profile_ai')
+    .select('narrative, strengths, improvement_areas, personality')
+    .eq('user_id', user.id)
+    .single()
+
+  const profileText = profileAi?.narrative
+    ? `${profileAi.narrative}\n\nFortalezas: ${(profileAi.strengths || []).join(', ')}\nAreas de mejora: ${(profileAi.improvement_areas || []).join(', ')}\nEstilo de comunicacion: ${profileAi.personality?.communication_style || 'desconocido'}\nEstilo de trabajo: ${profileAi.personality?.work_approach || 'desconocido'}`
+    : '(perfil aun no generado — se construye con el uso)'
+
   // --- Build context ---
   const tasksByStatus: Record<string, typeof context.tasks> = {}
   for (const t of context.tasks) {
@@ -152,6 +163,9 @@ export async function POST(request: NextRequest) {
 
 Today: ${context.today}
 Current time: ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+
+## Who is this user (AI-generated profile based on their data)
+${profileText}
 
 ## Your Memory (things you remember about the user)
 ${memoryText}
