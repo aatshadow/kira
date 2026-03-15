@@ -45,7 +45,7 @@ export async function POST() {
       .select('*')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
-      .limit(100),
+      .limit(500),
     supabase
       .from('chat_messages')
       .select('role, content, created_at')

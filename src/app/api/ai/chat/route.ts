@@ -99,17 +99,30 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // --- Load KIRA memories ---
-  const { data: memories } = await supabase
-    .from('kira_memory')
-    .select('category, content')
-    .eq('user_id', user.id)
-    .order('updated_at', { ascending: false })
-    .limit(50)
+  // --- Load KIRA memories (recent + important, never lost) ---
+  const [recentMemoriesRes, totalMemoriesRes] = await Promise.all([
+    supabase
+      .from('kira_memory')
+      .select('category, content')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(80),
+    supabase
+      .from('kira_memory')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+  ])
 
-  const memoryText = memories && memories.length > 0
+  const memories = recentMemoriesRes.data || []
+  const totalMemories = totalMemoriesRes.count || 0
+
+  let memoryText = memories.length > 0
     ? memories.map(m => `[${m.category}] ${m.content}`).join('\n')
     : '(no memories yet)'
+
+  if (totalMemories > 80) {
+    memoryText += `\n\n(Mostrando 80 memorias mas recientes de ${totalMemories} totales. El perfil AI contiene el analisis consolidado de todas.)`
+  }
 
   // --- Load AI-generated user profile ---
   const { data: profileAi } = await supabase
@@ -216,10 +229,10 @@ You can execute actions by including JSON action blocks in your response:
 **delete_meeting:**
 { "id": "meeting_id" }
 
-**save_memory** (save something to remember about the user):
-{ "category": "preference|habit|personal|work|important", "content": "what to remember" }
+**save_memory** (save something to remember about the user — use this generously, memory is permanent):
+{ "category": "preference|habit|personal|work|important|emotional|relationship|pattern", "content": "what to remember" }
 
-**delete_memory** (forget something):
+**delete_memory** (ONLY use when the user EXPLICITLY asks you to forget something):
 { "content_match": "partial text to match and delete" }
 
 **create_calendar_event** (create event in Google Calendar):
@@ -253,7 +266,7 @@ You can execute actions by including JSON action blocks in your response:
 7. You can answer questions about the user's tasks, schedule, productivity, etc.
 8. Be proactive — if the user says something vague, suggest the best interpretation.
 9. Keep responses concise but warm. You're a personal assistant, not a robot.
-10. When the user tells you personal preferences, habits, or asks you to remember something, use the save_memory action.
+10. When the user tells you personal preferences, habits, goals, mentions people, expresses emotions, or reveals anything about who they are, use the save_memory action PROACTIVELY. Don't wait for them to say "recuerda esto" — if it's worth remembering, save it. Your memory is permanent and grows with every conversation.
 11. When the user greets you (buenos días, hola, etc.), give a brief, warm greeting with a quick summary of their day: pending tasks for today, upcoming meetings, and any urgent items. Use your memory to personalize.
 12. You can reference your memories naturally in conversation — "como me dijiste..." or "recuerdo que prefieres..."
 13. Never show raw IDs to the user. Use names instead.
@@ -584,6 +597,21 @@ You can execute actions by including JSON action blocks in your response:
         .update({ updated_at: new Date().toISOString() })
         .eq('id', convId)
     }
+
+    // --- Fire-and-forget: silent observation of user behavior ---
+    const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
+    const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
+    fetch(`${baseUrl}/api/ai/observe`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: request.headers.get('cookie') || '',
+      },
+      body: JSON.stringify({
+        messages: [...messages, { role: 'assistant', content: displayText }],
+        conversationId: convId,
+      }),
+    }).catch(() => { /* silent */ })
 
     return NextResponse.json({
       message: displayText,
