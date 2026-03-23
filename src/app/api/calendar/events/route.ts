@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const timeMin = searchParams.get('timeMin') || new Date().toISOString()
   const timeMax = searchParams.get('timeMax') || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-  const maxResults = searchParams.get('maxResults') || '50'
+  const maxResults = searchParams.get('maxResults') || '250'
 
   try {
     const res = await fetch(
