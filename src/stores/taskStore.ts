@@ -3,12 +3,15 @@ import type { Task, Category, Project, Tag } from '@/types/task'
 
 type TaskView = 'list' | 'kanban' | 'feed' | 'calendar' | 'category' | 'project'
 
+export type DateRange = '' | 'today' | 'tomorrow' | 'yesterday' | 'this_week' | 'next_week' | 'this_month' | 'overdue' | 'no_date'
+
 interface TaskFilters {
   status: string[]
   category: string[]
   project: string
   priority: string[]
   search: string
+  dateRange: DateRange
 }
 
 interface TaskStore {
@@ -35,7 +38,7 @@ interface TaskStore {
   addTag: (tag: Tag) => void
   removeTag: (id: string) => void
   setView: (view: TaskView) => void
-  setFilter: (key: keyof TaskFilters, value: TaskFilters[keyof TaskFilters]) => void
+  setFilter: <K extends keyof TaskFilters>(key: K, value: TaskFilters[K]) => void
   resetFilters: () => void
   setLoading: (loading: boolean) => void
 }
@@ -46,6 +49,7 @@ const defaultFilters: TaskFilters = {
   project: '',
   priority: [],
   search: '',
+  dateRange: '',
 }
 
 export const useTaskStore = create<TaskStore>((set) => ({

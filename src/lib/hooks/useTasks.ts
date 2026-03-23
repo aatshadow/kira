@@ -89,6 +89,7 @@ export function useTasks() {
         post_notes: null,
         meeting_id: data.meeting_id || null,
         parent_task_id: data.parent_task_id || null,
+        actual_mins: data.actual_mins || null,
         sort_order: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

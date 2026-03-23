@@ -1,6 +1,6 @@
 'use client'
 
-import { Play, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Play, MoreHorizontal, Pencil, Trash2, CheckCircle2, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PriorityDot } from '@/components/shared/PriorityDot'
 import { ScoreDisplay } from '@/components/shared/ScoreDisplay'
@@ -188,9 +188,16 @@ export function TaskCard({ task, variant = 'list' }: TaskCardProps) {
               Editar
             </DropdownMenuItem>
             {task.status !== 'done' && (
-              <DropdownMenuItem onClick={() => handleStatusChange('done')}>
-                Marcar como Done
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onClick={() => handleStatusChange('done')}>
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
+                  Marcar como Done
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openModal('task-close', { taskId: task.id, totalSecs: 0, showManualTime: true })}>
+                  <Clock className="h-3.5 w-3.5 mr-2" />
+                  Completar con tiempo
+                </DropdownMenuItem>
+              </>
             )}
             <DropdownMenuItem
               onClick={handleDelete}

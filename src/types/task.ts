@@ -19,6 +19,7 @@ export interface Task {
   post_notes: string | null
   meeting_id: string | null
   parent_task_id: string | null
+  actual_mins: number | null
   sort_order: number
   created_at: string
   updated_at: string

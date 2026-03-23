@@ -7,6 +7,38 @@ import { getUserId } from '@/lib/supabase/getUserId'
 import { IS_DEMO, demoId } from '@/lib/demo'
 import type { Meeting } from '@/types/meeting'
 
+/**
+ * Auto-complete meetings whose scheduled_at + duration has passed.
+ * Runs once after fetch and then every 60s.
+ */
+async function autoCompletePastMeetings() {
+  const store = useMeetingStore.getState()
+  const now = new Date()
+
+  const toComplete = store.meetings.filter((m) => {
+    if (m.status !== 'scheduled' && m.status !== 'in_progress') return false
+    if (!m.scheduled_at) return false
+    const endTime = new Date(new Date(m.scheduled_at).getTime() + (m.duration_mins || 60) * 60000)
+    return endTime <= now
+  })
+
+  if (toComplete.length === 0) return
+
+  if (IS_DEMO) {
+    for (const m of toComplete) {
+      store.updateMeeting(m.id, { status: 'completed', updated_at: now.toISOString() })
+    }
+    localStorage.setItem('kira_demo_meetings', JSON.stringify(useMeetingStore.getState().meetings))
+    return
+  }
+
+  const supabase = createClient()
+  for (const m of toComplete) {
+    await supabase.from('meetings').update({ status: 'completed', updated_at: now.toISOString() }).eq('id', m.id)
+    store.updateMeeting(m.id, { status: 'completed', updated_at: now.toISOString() })
+  }
+}
+
 async function fetchMeetingsData() {
   const store = useMeetingStore.getState()
   store.setLoading(true)
@@ -25,6 +57,8 @@ async function fetchMeetingsData() {
     console.error('[KIRA] fetchMeetings error:', err)
   } finally {
     useMeetingStore.getState().setLoading(false)
+    // Auto-complete past meetings after data is loaded
+    autoCompletePastMeetings()
   }
 }
 
@@ -84,6 +118,10 @@ export function useMeetings() {
     if (didFetch.current) return
     didFetch.current = true
     fetchMeetingsData()
+
+    // Check every 60s for meetings that should be auto-completed
+    const interval = setInterval(autoCompletePastMeetings, 60_000)
+    return () => clearInterval(interval)
   }, [])
 
   const createMeeting = async (data: Partial<Meeting>) => {

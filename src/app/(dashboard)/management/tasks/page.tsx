@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { Plus, Search, List, Columns3, LayoutGrid, Calendar, FolderKanban, Layers } from 'lucide-react'
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -11,7 +12,7 @@ import { TaskFeed } from '@/components/tasks/TaskFeed'
 import { TaskCalendar } from '@/components/tasks/TaskCalendar'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useTasks } from '@/lib/hooks/useTasks'
-import { useTaskStore } from '@/stores/taskStore'
+import { useTaskStore, type DateRange } from '@/stores/taskStore'
 import { useUIStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,33 @@ const viewLabels = {
   list: 'Lista', kanban: 'Kanban', feed: 'Feed', calendar: 'Calendario', category: 'Categoría', project: 'Proyecto',
 } as const
 
+function getDateRangeBounds(range: DateRange): { start: Date; end: Date } | null {
+  if (!range) return null
+  const now = new Date()
+  switch (range) {
+    case 'today':
+      return { start: startOfDay(now), end: endOfDay(now) }
+    case 'tomorrow':
+      return { start: startOfDay(addDays(now, 1)), end: endOfDay(addDays(now, 1)) }
+    case 'yesterday':
+      return { start: startOfDay(addDays(now, -1)), end: endOfDay(addDays(now, -1)) }
+    case 'this_week':
+      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) }
+    case 'next_week': {
+      const nextWeekStart = addDays(startOfWeek(now, { weekStartsOn: 1 }), 7)
+      return { start: nextWeekStart, end: endOfWeek(nextWeekStart, { weekStartsOn: 1 }) }
+    }
+    case 'this_month':
+      return { start: startOfMonth(now), end: endOfMonth(now) }
+    case 'overdue':
+      return { start: new Date(0), end: startOfDay(now) }
+    case 'no_date':
+      return null // handled specially
+    default:
+      return null
+  }
+}
+
 export default function ManagementTasksPage() {
   useTasks()
   const { tasks, categories, projects, view, filters, setView, setFilter } = useTaskStore()
@@ -31,9 +59,14 @@ export default function ManagementTasksPage() {
 
   const filteredTasks = useMemo(() => {
     let result = tasks.filter((t) => t.status !== 'deleted')
+
+    // By default hide completed tasks unless user explicitly filters for 'done'
+    if (filters.status.length === 0) {
+      result = result.filter((t) => t.status !== 'done')
+    }
+
     if (filters.status.length > 0) {
       if (filters.status.includes('overdue')) {
-        // Special filter: overdue = past due_date + not done
         result = result.filter((t) => t.due_date && t.due_date < today && t.status !== 'done')
       } else {
         result = result.filter((t) => filters.status.includes(t.status))
@@ -42,6 +75,25 @@ export default function ManagementTasksPage() {
     if (filters.category.length > 0) result = result.filter((t) => t.category_id && filters.category.includes(t.category_id))
     if (filters.project) result = result.filter((t) => t.project_id === filters.project)
     if (filters.priority.length > 0) result = result.filter((t) => t.priority && filters.priority.includes(t.priority))
+
+    // Date range filter
+    if (filters.dateRange === 'no_date') {
+      result = result.filter((t) => !t.due_date)
+    } else if (filters.dateRange) {
+      const bounds = getDateRangeBounds(filters.dateRange)
+      if (bounds) {
+        if (filters.dateRange === 'overdue') {
+          result = result.filter((t) => t.due_date && new Date(t.due_date) < bounds.end && t.status !== 'done')
+        } else {
+          result = result.filter((t) => {
+            if (!t.due_date) return false
+            const d = new Date(t.due_date)
+            return d >= bounds.start && d <= bounds.end
+          })
+        }
+      }
+    }
+
     if (filters.search) {
       const q = filters.search.toLowerCase()
       result = result.filter((t) => t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.tags?.some((tag) => tag.toLowerCase().includes(q)))
@@ -52,6 +104,10 @@ export default function ManagementTasksPage() {
   const overdueCount = useMemo(() =>
     tasks.filter((t) => t.status !== 'deleted' && t.status !== 'done' && t.due_date && t.due_date < today).length
   , [tasks, today])
+
+  const doneCount = useMemo(() =>
+    tasks.filter((t) => t.status === 'done').length
+  , [tasks])
 
   const renderGroupedView = (groupBy: 'category' | 'project') => {
     const groups = groupBy === 'category'
@@ -93,6 +149,23 @@ export default function ManagementTasksPage() {
             )
           })}
         </div>
+
+        {/* Date range filter */}
+        <Select value={filters.dateRange || 'all'} onValueChange={(v) => setFilter('dateRange', v === 'all' ? '' : v as DateRange)}>
+          <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Fecha" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las fechas</SelectItem>
+            <SelectItem value="today">Hoy</SelectItem>
+            <SelectItem value="tomorrow">Mañana</SelectItem>
+            <SelectItem value="yesterday">Ayer</SelectItem>
+            <SelectItem value="this_week">Esta semana</SelectItem>
+            <SelectItem value="next_week">Próxima semana</SelectItem>
+            <SelectItem value="this_month">Este mes</SelectItem>
+            <SelectItem value="overdue">Vencidas ({overdueCount})</SelectItem>
+            <SelectItem value="no_date">Sin fecha</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select value={filters.priority.length > 0 ? filters.priority[0] : 'all'} onValueChange={(v) => setFilter('priority', !v || v === 'all' ? [] as string[] : [v])}>
           <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue placeholder="Prioridad" /></SelectTrigger>
           <SelectContent>
@@ -104,17 +177,31 @@ export default function ManagementTasksPage() {
           </SelectContent>
         </Select>
         <Select value={filters.status.length > 0 ? filters.status[0] : 'all'} onValueChange={(v) => setFilter('status', !v || v === 'all' ? [] as string[] : [v])}>
-          <SelectTrigger className="w-[130px] h-9 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Activas</SelectItem>
             <SelectItem value="overdue">Pasadas ({overdueCount})</SelectItem>
             <SelectItem value="backlog">Backlog</SelectItem>
             <SelectItem value="todo">To Do</SelectItem>
             <SelectItem value="in_progress">In Progress</SelectItem>
             <SelectItem value="waiting">Waiting</SelectItem>
-            <SelectItem value="done">Done</SelectItem>
+            <SelectItem value="done">Done ({doneCount})</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Project filter */}
+        {projects.length > 0 && (
+          <Select value={filters.project || 'all'} onValueChange={(v) => setFilter('project', !v || v === 'all' ? '' : v)}>
+            <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Proyecto" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los proyectos</SelectItem>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <div className="relative ml-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input placeholder="Buscar..." value={filters.search} onChange={(e) => setFilter('search', e.target.value)} className="pl-9 h-9 w-[200px] text-xs bg-secondary" />

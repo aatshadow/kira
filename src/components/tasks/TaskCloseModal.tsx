@@ -21,11 +21,12 @@ const difficulties = [
 export function TaskCloseModal() {
   const { activeModal, modalData, closeModal } = useUIStore()
   const { tasks } = useTaskStore()
-  const { completeTask, createTask } = useTasks()
+  const { completeTask, createTask, editTask } = useTasks()
 
   const isOpen = activeModal === 'task-close'
   const taskId = modalData?.taskId as string | undefined
   const totalSecs = (modalData?.totalSecs as number) || 0
+  const showManualTime = (modalData?.showManualTime as boolean) || false
   const task = tasks.find((t) => t.id === taskId)
 
   const [difficulty, setDifficulty] = useState<string>('')
@@ -33,16 +34,33 @@ export function TaskCloseModal() {
   const [hasPending, setHasPending] = useState(false)
   const [pendingTitle, setPendingTitle] = useState('')
   const [saving, setSaving] = useState(false)
+  const [manualHours, setManualHours] = useState('')
+  const [manualMins, setManualMins] = useState('')
 
   if (!isOpen || !task) return null
 
+  const displaySecs = totalSecs > 0 ? totalSecs : (manualHours || manualMins ? (parseInt(manualHours || '0') * 3600 + parseInt(manualMins || '0') * 60) : 0)
+
   const handleConfirm = async () => {
     setSaving(true)
+
+    // Calculate actual_mins from timer or manual input
+    let actualMins: number | undefined
+    if (totalSecs > 0) {
+      actualMins = Math.ceil(totalSecs / 60)
+    } else if (manualHours || manualMins) {
+      actualMins = (parseInt(manualHours || '0') * 60) + parseInt(manualMins || '0')
+    }
 
     await completeTask(task.id, {
       difficulty: (difficulty as 'easier' | 'as_expected' | 'harder') || undefined,
       post_notes: postNotes.trim() || undefined,
     })
+
+    // Save actual_mins separately via editTask
+    if (actualMins && actualMins > 0) {
+      await editTask(task.id, { actual_mins: actualMins })
+    }
 
     if (hasPending && pendingTitle.trim()) {
       await createTask({
@@ -71,7 +89,36 @@ export function TaskCloseModal() {
           <div className="flex items-center justify-between p-4 rounded-lg bg-secondary">
             <div>
               <p className="text-xs text-muted-foreground">Tiempo invertido</p>
-              <p className="text-xl font-mono text-[#00D4FF]">{formatTime(totalSecs)}</p>
+              {totalSecs > 0 ? (
+                <p className="text-xl font-mono text-[#00D4FF]">{formatTime(totalSecs)}</p>
+              ) : (
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="99"
+                      placeholder="0"
+                      value={manualHours}
+                      onChange={(e) => setManualHours(e.target.value)}
+                      className="w-16 h-8 text-center text-sm bg-background"
+                    />
+                    <span className="text-xs text-muted-foreground">h</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="59"
+                      placeholder="0"
+                      value={manualMins}
+                      onChange={(e) => setManualMins(e.target.value)}
+                      className="w-16 h-8 text-center text-sm bg-background"
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
+                </div>
+              )}
             </div>
             {task.estimated_mins && (
               <div className="text-right">
