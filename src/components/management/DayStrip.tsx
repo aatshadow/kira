@@ -42,9 +42,50 @@ export function DayStrip() {
   const { tasks } = useTaskStore()
   const { meetings } = useMeetingStore()
   const [workedMins, setWorkedMins] = useState(0)
+  const [gcalMeetings, setGcalMeetings] = useState<{ count: number; mins: number }>({ count: 0, mins: 0 })
 
   const todayStr = new Date().toDateString()
   const todayDate = new Date().toISOString().split('T')[0]
+
+  // Fetch Google Calendar events for today
+  useEffect(() => {
+    async function fetchGcalToday() {
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+      const end = new Date()
+      end.setHours(23, 59, 59, 999)
+      try {
+        const res = await fetch(
+          `/api/calendar/events?timeMin=${start.toISOString()}&timeMax=${end.toISOString()}`
+        )
+        if (!res.ok) return
+        const data = await res.json()
+        const events = data.events || []
+
+        // Deduplicate: exclude events already linked to KIRA meetings
+        const kiraMeetings = useMeetingStore.getState().meetings
+        const filtered = events.filter((e: { id: string; title: string; start: string }) => {
+          return !kiraMeetings.some(
+            (m) => m.calendar_event_id === e.id ||
+              (m.title === e.title && m.scheduled_at && new Date(m.scheduled_at).toDateString() === todayStr)
+          )
+        })
+
+        let totalMins = 0
+        filtered.forEach((e: { start?: string; end?: string }) => {
+          if (e.start && e.end) {
+            const s = new Date(e.start).getTime()
+            const en = new Date(e.end).getTime()
+            if (!isNaN(s) && !isNaN(en) && en > s) totalMins += Math.round((en - s) / 60000)
+          }
+        })
+
+        setGcalMeetings({ count: filtered.length, mins: totalMins })
+      } catch { /* ignore */ }
+    }
+
+    fetchGcalToday()
+  }, [todayStr])
 
   // Fetch today's worked time from timer sessions
   useEffect(() => {
@@ -132,7 +173,7 @@ export function DayStrip() {
       <Stat icon={CheckCircle2} label="Completadas" value={tasksCompletedToday} />
       <Stat icon={Target} label="Estimado hoy" value={fmtMins(estimatedTodayMins)} />
       <Stat icon={Timer} label="Invertido hoy" value={fmtMins(workedMins)} accent />
-      <Stat icon={CalendarCheck} label="Meetings" value={`${meetingsToday} · ${fmtMins(meetingsMinsToday)}`} />
+      <Stat icon={CalendarCheck} label="Meetings" value={`${meetingsToday + gcalMeetings.count} · ${fmtMins(meetingsMinsToday + gcalMeetings.mins)}`} />
     </div>
   )
 }
