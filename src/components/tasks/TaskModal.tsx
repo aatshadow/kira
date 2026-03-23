@@ -38,6 +38,8 @@ export function TaskModal() {
   const [dueDate, setDueDate] = useState('')
   const [taskTags, setTaskTags] = useState('')
   const [notes, setNotes] = useState('')
+  const [actualHours, setActualHours] = useState('')
+  const [actualMins, setActualMins] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -54,6 +56,9 @@ export function TaskModal() {
       setDueDate(existingTask.due_date || '')
       setTaskTags(existingTask.tags?.join(', ') || '')
       setNotes(existingTask.notes || '')
+      const am = existingTask.actual_mins || 0
+      setActualHours(am >= 60 ? Math.floor(am / 60).toString() : '')
+      setActualMins(am > 0 ? (am % 60).toString() : '')
     } else {
       setMode(modalData?.mode === 'ai' ? 'ai' : 'manual')
       setTitle('')
@@ -65,6 +70,8 @@ export function TaskModal() {
       setDueDate('')
       setTaskTags('')
       setNotes('')
+      setActualHours('')
+      setActualMins('')
       setAiText('')
       setAiError('')
     }
@@ -120,6 +127,10 @@ export function TaskModal() {
     }
 
     setSaving(true)
+    const computedActualMins = (actualHours || actualMins)
+      ? (parseInt(actualHours || '0') * 60) + parseInt(actualMins || '0')
+      : null
+
     const data = {
       title: title.trim(),
       description: description.trim() || null,
@@ -127,6 +138,7 @@ export function TaskModal() {
       project_id: projectId || null,
       priority,
       estimated_mins: estimatedMins ? parseInt(estimatedMins) : null,
+      actual_mins: computedActualMins,
       due_date: dueDate || null,
       tags: taskTags
         .split(',')
@@ -306,6 +318,41 @@ export function TaskModal() {
                   />
                 </div>
               </div>
+
+              {/* Actual time spent */}
+              {isEdit && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">
+                    Tiempo real dedicado
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="99"
+                        placeholder="0"
+                        value={actualHours}
+                        onChange={(e) => setActualHours(e.target.value)}
+                        className="w-20 bg-secondary"
+                      />
+                      <span className="text-xs text-muted-foreground">h</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="59"
+                        placeholder="0"
+                        value={actualMins}
+                        onChange={(e) => setActualMins(e.target.value)}
+                        className="w-20 bg-secondary"
+                      />
+                      <span className="text-xs text-muted-foreground">min</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Tags */}
               <div>
