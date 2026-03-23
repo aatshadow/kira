@@ -96,7 +96,16 @@ export function TaskCard({ task, variant = 'list' }: TaskCardProps) {
 
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <div className="flex items-center gap-3">
-            {task.estimated_mins && <span>{formatDuration(task.estimated_mins)}</span>}
+            {task.actual_mins != null && task.actual_mins > 0 && (
+              <span className="text-[#00D4FF]" title="Tiempo invertido">
+                {formatDuration(task.actual_mins)}
+              </span>
+            )}
+            {task.estimated_mins && (
+              <span title="Tiempo estimado">
+                {task.actual_mins ? `/ ${formatDuration(task.estimated_mins)}` : formatDuration(task.estimated_mins)}
+              </span>
+            )}
             {task.due_date && (
               <span>
                 {new Date(task.due_date).toLocaleDateString('es-ES', {
@@ -158,7 +167,12 @@ export function TaskCard({ task, variant = 'list' }: TaskCardProps) {
       <div className="hidden md:flex items-center gap-3 text-[11px] text-muted-foreground">
         {category && <span>{category.name}</span>}
         {project && <span className="text-muted-foreground/60">{project.name}</span>}
-        {task.estimated_mins && <span>{formatDuration(task.estimated_mins)}</span>}
+        {task.actual_mins != null && task.actual_mins > 0 && (
+          <span className="text-[#00D4FF]">{formatDuration(task.actual_mins)}</span>
+        )}
+        {task.estimated_mins && (
+          <span>{task.actual_mins ? `/ ${formatDuration(task.estimated_mins)}` : formatDuration(task.estimated_mins)}</span>
+        )}
       </div>
 
       <ScoreDisplay score={task.kira_score} className="hidden lg:block" />

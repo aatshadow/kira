@@ -5,7 +5,7 @@ import { X, Play, Pause, Square, Plus, ChevronRight } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useTimer } from '@/lib/hooks/useTimer'
-import { formatTime } from '@/lib/utils/time'
+import { formatTime, formatDuration } from '@/lib/utils/time'
 import { Button } from '@/components/ui/button'
 import { PriorityDot } from '@/components/shared/PriorityDot'
 import { cn } from '@/lib/utils'
@@ -77,6 +77,15 @@ export function TimerFloat() {
                 <p className="text-sm text-muted-foreground text-center truncate max-w-full mb-1">
                   {activeSession.taskTitle}
                 </p>
+                {(() => {
+                  const task = tasks.find((t) => t.id === activeSession.taskId)
+                  const prev = task?.actual_mins || 0
+                  return prev > 0 ? (
+                    <p className="text-[11px] text-[#00D4FF]/70 text-center mb-1">
+                      Acumulado previo: {formatDuration(prev)}
+                    </p>
+                  ) : null
+                })()}
                 <p className="text-[11px] text-muted-foreground/60 text-center mb-4">
                   {[activeSession.taskCategory, activeSession.taskProject].filter(Boolean).join(' · ')}
                 </p>

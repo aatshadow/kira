@@ -4,12 +4,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { useUIStore } from '@/stores/uiStore'
 import { useTimerStore } from '@/stores/timerStore'
+import { useTaskStore } from '@/stores/taskStore'
 import { useTimer } from '@/lib/hooks/useTimer'
-import { formatTime } from '@/lib/utils/time'
+import { formatTime, formatDuration } from '@/lib/utils/time'
 
 export function TimerStopModal() {
   const { activeModal, modalData, closeModal, openModal } = useUIStore()
   const { sessions } = useTimerStore()
+  const { tasks } = useTaskStore()
   const { stopTimer } = useTimer()
 
   const isOpen = activeModal === 'timer-stop'
@@ -17,6 +19,11 @@ export function TimerStopModal() {
   const session = sessions.find((s) => s.id === sessionId)
 
   if (!isOpen || !session) return null
+
+  const task = tasks.find((t) => t.id === session.taskId)
+  const prevMins = task?.actual_mins || 0
+  const sessionMins = Math.ceil(session.elapsedSecs / 60)
+  const totalMins = prevMins + sessionMins
 
   const handleCloseSession = async () => {
     await stopTimer(session.id, false)
@@ -43,6 +50,11 @@ export function TimerStopModal() {
               {formatTime(session.elapsedSecs)}
             </p>
             <p className="text-sm text-muted-foreground">{session.taskTitle}</p>
+            {prevMins > 0 && (
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                Previo: {formatDuration(prevMins)} · Total: {formatDuration(totalMins)}
+              </p>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mb-4 text-center">
             ¿Qué quieres hacer con esta sesión?

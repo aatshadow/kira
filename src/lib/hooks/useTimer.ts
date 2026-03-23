@@ -117,22 +117,28 @@ export function useTimer() {
       if (!session) return
 
       const netSecs = session.elapsedSecs
+      const sessionMins = Math.ceil(netSecs / 60)
       const supabase = IS_DEMO ? null : createClient()
 
       if (!IS_DEMO) {
         await supabase!.from('timer_sessions').update({ ended_at: new Date().toISOString(), net_secs: netSecs, status: 'completed' }).eq('id', sessionId)
       }
 
+      // Accumulate time on the task (always, not just on done)
+      const currentTask = useTaskStore.getState().tasks.find((t) => t.id === session.taskId)
+      const prevMins = currentTask?.actual_mins || 0
+      const newActualMins = prevMins + sessionMins
+
       if (markDone) {
         if (!IS_DEMO) {
-          await supabase!.from('tasks').update({ status: 'done', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', session.taskId)
+          await supabase!.from('tasks').update({ status: 'done', completed_at: new Date().toISOString(), actual_mins: newActualMins, updated_at: new Date().toISOString() }).eq('id', session.taskId)
         }
-        updateTask(session.taskId, { status: 'done', completed_at: new Date().toISOString() })
+        updateTask(session.taskId, { status: 'done', completed_at: new Date().toISOString(), actual_mins: newActualMins })
       } else {
         if (!IS_DEMO) {
-          await supabase!.from('tasks').update({ status: 'todo', updated_at: new Date().toISOString() }).eq('id', session.taskId)
+          await supabase!.from('tasks').update({ status: 'todo', actual_mins: newActualMins, updated_at: new Date().toISOString() }).eq('id', session.taskId)
         }
-        updateTask(session.taskId, { status: 'todo' })
+        updateTask(session.taskId, { status: 'todo', actual_mins: newActualMins })
       }
 
       removeSession(sessionId)
