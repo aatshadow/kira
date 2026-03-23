@@ -8,6 +8,7 @@ import { MeetingCard } from '@/components/meetings/MeetingCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useMeetings } from '@/lib/hooks/useMeetings'
 import { useUIStore } from '@/stores/uiStore'
+import { DayStrip } from '@/components/management/DayStrip'
 import type { Meeting } from '@/types/meeting'
 
 export default function ManagementMeetingsPage() {
@@ -29,6 +30,7 @@ export default function ManagementMeetingsPage() {
 
   return (
     <div>
+      <DayStrip />
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-foreground">Meetings</h2>
         <Button onClick={() => openModal('meeting-create')} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] hover:shadow-[0_0_8px_rgba(0,212,255,0.4)]">

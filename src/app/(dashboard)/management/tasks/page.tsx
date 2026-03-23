@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { useTasks } from '@/lib/hooks/useTasks'
 import { useTaskStore, type DateRange } from '@/stores/taskStore'
 import { useUIStore } from '@/stores/uiStore'
+import { DayStrip } from '@/components/management/DayStrip'
 import { cn } from '@/lib/utils'
 
 const viewIcons = {
@@ -135,6 +136,7 @@ export default function ManagementTasksPage() {
 
   return (
     <div>
+      <DayStrip />
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <Button onClick={() => openModal('task-create')} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] hover:shadow-[0_0_8px_rgba(0,212,255,0.4)]">
           <Plus className="h-4 w-4 mr-1" /> Nueva task

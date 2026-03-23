@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { cn } from '@/lib/utils'
+import { DayStrip } from '@/components/management/DayStrip'
 import { createClient } from '@/lib/supabase/client'
 import { getUserId } from '@/lib/supabase/getUserId'
 import { format, subDays, isSameDay } from 'date-fns'
@@ -145,6 +146,7 @@ export default function HabitsPage() {
 
   return (
     <div>
+      <DayStrip />
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-foreground">Hábitos</h2>
         <Button
