@@ -42,9 +42,12 @@ export default function CalendarPage() {
   const fetchGoogleEvents = useCallback(async () => {
     const monthStart = startOfMonth(currentMonth)
     const monthEnd = endOfMonth(currentMonth)
+    // Always fetch at least 7 days ahead from today
+    const sevenDaysAhead = addDays(new Date(), 7)
+    const timeMax = monthEnd > sevenDaysAhead ? monthEnd : sevenDaysAhead
     try {
       const res = await fetch(
-        `/api/calendar/events?timeMin=${monthStart.toISOString()}&timeMax=${monthEnd.toISOString()}`
+        `/api/calendar/events?timeMin=${monthStart.toISOString()}&timeMax=${timeMax.toISOString()}`
       )
       if (res.ok) {
         const data = await res.json()
