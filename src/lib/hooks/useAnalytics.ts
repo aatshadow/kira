@@ -37,6 +37,7 @@ export interface TaskRecord {
   status: string
   priority: string | null
   estimated_mins: number | null
+  actual_mins: number | null
   created_at: string
   completed_at: string | null
   kira_score: number | null
@@ -197,7 +198,26 @@ export function useAnalytics() {
     const habitLogs = (habitLogsRes.data || []) as HabitLogRecord[]
 
     /* ---- TIME ---- */
-    const totalWorkedSecs = sessions.reduce((acc: number, s: Record<string, unknown>) => acc + ((s.net_secs as number) || 0), 0)
+    // Build a map of timer-session time per task
+    const timerTimeMap: Record<string, number> = {}
+    sessions.forEach((s: Record<string, unknown>) => {
+      const taskId = s.task_id as string
+      if (taskId) timerTimeMap[taskId] = (timerTimeMap[taskId] || 0) + ((s.net_secs as number) || 0)
+    })
+
+    // For each task: prefer actual_mins (manual/corrected) over timer sessions
+    const getTaskSecs = (taskId: string): number => {
+      const task = allTasks.find(t => t.id === taskId)
+      if (task?.actual_mins != null && task.actual_mins > 0) {
+        return task.actual_mins * 60
+      }
+      return timerTimeMap[taskId] || 0
+    }
+
+    // Only count tasks whose sessions fall in range
+    const sessionTaskIds = new Set<string>(sessions.map((s: Record<string, unknown>) => s.task_id as string))
+    let totalWorkedSecs = 0
+    sessionTaskIds.forEach((taskId) => { totalWorkedSecs += getTaskSecs(taskId) })
 
     /* ---- TASKS ---- */
     const completedInRange = allTasks.filter(
@@ -241,13 +261,10 @@ export function useAnalytics() {
     const totalRelevant = createdInRange.length + completedInRange.filter(t => !createdInRange.some(c => c.id === t.id)).length
     const completionRate = totalRelevant > 0 ? Math.round((completedInRange.length / totalRelevant) * 100) : null
 
-    /* Avg time per task */
-    const taskTimeMap: Record<string, number> = {}
-    sessions.forEach((s: Record<string, unknown>) => {
-      const taskId = s.task_id as string
-      if (taskId) taskTimeMap[taskId] = (taskTimeMap[taskId] || 0) + ((s.net_secs as number) || 0)
-    })
-    const completedTaskTimes = completedInRange.filter(t => taskTimeMap[t.id]).map(t => taskTimeMap[t.id])
+    /* Avg time per task — uses actual_mins when available */
+    const completedTaskTimes = completedInRange
+      .map(t => getTaskSecs(t.id))
+      .filter(secs => secs > 0)
     const avgTimePerTaskSecs = completedTaskTimes.length > 0
       ? Math.round(completedTaskTimes.reduce((a, b) => a + b, 0) / completedTaskTimes.length)
       : null
@@ -257,39 +274,53 @@ export function useAnalytics() {
     allTasks.forEach(t => { if (t.status !== 'deleted') statusCounts[t.status] = (statusCounts[t.status] || 0) + 1 })
     const tasksByStatus = Object.entries(statusCounts).map(([status, count]) => ({ status, count }))
 
-    /* Top 5 longest tasks */
-    const topLongestTasks = Object.entries(taskTimeMap)
-      .sort((a, b) => b[1] - a[1])
+    /* Top 5 longest tasks — uses actual_mins when available */
+    const topLongestTasks = (Array.from(sessionTaskIds) as string[])
+      .map(taskId => ({ taskId, secs: getTaskSecs(taskId) }))
+      .filter(x => x.secs > 0)
+      .sort((a, b) => b.secs - a.secs)
       .slice(0, 5)
-      .map(([taskId, secs]) => {
+      .map(({ taskId, secs }) => {
         const task = allTasks.find(t => t.id === taskId)
         return { title: task?.title || 'Unknown', secs }
       })
 
-    /* Time by category */
+    /* Time by category — uses actual_mins when available */
     const catMap: Record<string, number> = {}
+    const processedTasksForCat = new Set<string>()
     sessions.forEach((s: Record<string, unknown>) => {
+      const taskId = s.task_id as string
+      if (processedTasksForCat.has(taskId)) return
+      processedTasksForCat.add(taskId)
       const task = s.tasks as Record<string, unknown> | null
       const cat = task?.categories as Record<string, unknown> | null
       const name = (cat?.name as string) || 'Sin categoria'
-      catMap[name] = (catMap[name] || 0) + ((s.net_secs as number) || 0)
+      catMap[name] = (catMap[name] || 0) + getTaskSecs(taskId)
     })
 
-    /* Time by project */
+    /* Time by project — uses actual_mins when available */
     const projMap: Record<string, number> = {}
+    const processedTasksForProj = new Set<string>()
     sessions.forEach((s: Record<string, unknown>) => {
+      const taskId = s.task_id as string
+      if (processedTasksForProj.has(taskId)) return
+      processedTasksForProj.add(taskId)
       const task = s.tasks as Record<string, unknown> | null
       const proj = task?.projects as Record<string, unknown> | null
       const name = (proj?.name as string) || 'Sin proyecto'
-      projMap[name] = (projMap[name] || 0) + ((s.net_secs as number) || 0)
+      projMap[name] = (projMap[name] || 0) + getTaskSecs(taskId)
     })
 
-    /* Time by priority */
+    /* Time by priority — uses actual_mins when available */
     const prioMap: Record<string, number> = {}
+    const processedTasksForPrio = new Set<string>()
     sessions.forEach((s: Record<string, unknown>) => {
+      const taskId = s.task_id as string
+      if (processedTasksForPrio.has(taskId)) return
+      processedTasksForPrio.add(taskId)
       const task = s.tasks as Record<string, unknown> | null
       const prio = (task?.priority as string) || 'none'
-      prioMap[prio] = (prioMap[prio] || 0) + ((s.net_secs as number) || 0)
+      prioMap[prio] = (prioMap[prio] || 0) + getTaskSecs(taskId)
     })
 
     /* Heatmap */
@@ -305,9 +336,7 @@ export function useAnalytics() {
     let efficiencyRatio: number | null = null
     if (completedWithEstimate.length > 0) {
       const totalEstimatedSecs = completedWithEstimate.reduce((acc, t) => acc + ((t.estimated_mins || 0) * 60), 0)
-      const totalActualSecs = sessions
-        .filter((s: Record<string, unknown>) => completedWithEstimate.some(t => t.id === (s.task_id as string)))
-        .reduce((acc: number, s: Record<string, unknown>) => acc + ((s.net_secs as number) || 0), 0)
+      const totalActualSecs = completedWithEstimate.reduce((acc, t) => acc + getTaskSecs(t.id), 0)
       efficiencyRatio = totalActualSecs > 0 ? Math.round((totalEstimatedSecs / totalActualSecs) * 100) : null
     }
 
