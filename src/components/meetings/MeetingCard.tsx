@@ -38,7 +38,7 @@ const statusLabels: Record<string, string> = {
 export function MeetingCard({ meeting, onEdit, onComplete, onCancel, onDelete }: MeetingCardProps) {
   return (
     <motion.div
-      className="group flex items-center gap-4 p-4 rounded-lg border border-border hover:border-[rgba(0,212,255,0.15)] bg-card transition-colors cursor-pointer"
+      className="group flex items-center gap-4 p-5 rounded-[20px] bg-white/[0.07] border-[0.5px] border-white/[0.1] hover:border-[rgba(0,212,255,0.15)] backdrop-blur-sm transition-colors cursor-pointer"
       onClick={() => onEdit(meeting)}
       whileHover={{ y: -1 }}
       whileTap={{ scale: 0.99 }}
@@ -117,7 +117,7 @@ export function MeetingCard({ meeting, onEdit, onComplete, onCancel, onDelete }:
         >
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="rounded-2xl bg-[#1C1C1E]/95 backdrop-blur-xl border-white/[0.1]">
           <DropdownMenuItem onClick={() => onEdit(meeting)}>Editar</DropdownMenuItem>
           {(meeting.status === 'scheduled' || meeting.status === 'in_progress') && (
             <DropdownMenuItem onClick={() => onComplete(meeting)}>

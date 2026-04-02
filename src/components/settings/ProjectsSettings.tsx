@@ -46,7 +46,7 @@ export function ProjectsSettings() {
       <h2 className="text-lg font-semibold">Proyectos</h2>
       <div className="space-y-2">
         {projects.map((proj) => (
-          <div key={proj.id} className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-secondary transition-colors">
+          <div key={proj.id} className="flex items-center justify-between py-2 px-3 hover:bg-white/[0.05] rounded-xl transition-colors">
             <span className="text-sm text-foreground">{proj.name}</span>
             <div className="flex items-center gap-1">
               <button onClick={() => handleArchive(proj.id)} className="text-muted-foreground hover:text-foreground cursor-pointer p-1" title="Archivar">
@@ -60,8 +60,8 @@ export function ProjectsSettings() {
         ))}
       </div>
       <div className="flex gap-2 max-w-sm">
-        <Input placeholder="Nuevo proyecto" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} className="bg-secondary" />
-        <Button onClick={handleAdd} variant="secondary" size="sm"><Plus className="h-4 w-4" /></Button>
+        <Input placeholder="Nuevo proyecto" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} className="bg-white/[0.06] border-white/[0.1] rounded-xl" />
+        <Button onClick={handleAdd} variant="secondary" size="sm" className="rounded-2xl"><Plus className="h-4 w-4" /></Button>
       </div>
     </div>
   )

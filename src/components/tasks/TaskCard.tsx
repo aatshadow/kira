@@ -48,8 +48,8 @@ export function TaskCard({ task, variant = 'list' }: TaskCardProps) {
     return (
       <motion.div
         className={cn(
-          'group relative rounded-lg border bg-card p-5 transition-all cursor-pointer',
-          'border-border hover:border-[rgba(0,212,255,0.15)]',
+          'group relative rounded-[20px] bg-white/[0.07] border border-white/[0.1] p-6 transition-all cursor-pointer backdrop-blur-sm',
+          'hover:border-[rgba(0,212,255,0.15)]',
           task.priority && priorityGlow[task.priority],
           task.status === 'done' && 'opacity-60'
         )}
@@ -110,8 +110,8 @@ export function TaskCard({ task, variant = 'list' }: TaskCardProps) {
   return (
     <motion.div
       className={cn(
-        'group flex items-center gap-3 py-3 px-0 border-b border-border/50 transition-all',
-        'hover:bg-secondary hover:px-4 hover:rounded-md hover:border-transparent',
+        'group flex items-center gap-3 py-3 px-3 transition-all',
+        'hover:bg-white/[0.06] hover:px-4 rounded-2xl',
         task.priority && priorityGlow[task.priority],
         task.status === 'done' && 'opacity-60'
       )}
@@ -167,7 +167,7 @@ export function TaskCard({ task, variant = 'list' }: TaskCardProps) {
           <DropdownMenuTrigger className="p-1 text-muted-foreground hover:text-foreground cursor-pointer">
             <MoreHorizontal className="h-3.5 w-3.5" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="rounded-2xl bg-[#1C1C1E]/95 backdrop-blur-xl border-white/[0.1]">
             <DropdownMenuItem onClick={handleEdit}>
               <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
             </DropdownMenuItem>

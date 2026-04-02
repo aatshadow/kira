@@ -25,7 +25,7 @@ export function TagsSettings() {
       ) : (
         <div className="space-y-2">
           {tags.map((tag) => (
-            <div key={tag.id} className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-secondary transition-colors">
+            <div key={tag.id} className="flex items-center justify-between py-2 px-3 hover:bg-white/[0.05] rounded-xl transition-colors">
               <span className="text-sm text-foreground">#{tag.name}</span>
               <button onClick={() => handleDelete(tag.id)} className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors">
                 <Trash2 className="h-3.5 w-3.5" />

@@ -45,9 +45,34 @@ export default function SettingsPage() {
         Settings
       </motion.h1>
 
+      {/* Mobile: horizontal scrollable pill bar */}
+      <motion.nav
+        variants={fadeUp}
+        className="md:hidden flex gap-2 overflow-x-auto pb-4 scrollbar-none -mx-1 px-1"
+      >
+        {sections.map((s) => {
+          const Icon = s.icon
+          return (
+            <button
+              key={s.id}
+              onClick={() => setActiveSection(s.id)}
+              className={cn(
+                'relative flex items-center gap-1.5 shrink-0 px-3.5 py-2 text-sm rounded-2xl transition-colors cursor-pointer whitespace-nowrap',
+                activeSection === s.id
+                  ? 'bg-white/[0.08] border border-white/[0.1] text-[#00D4FF]'
+                  : 'bg-white/[0.03] border border-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {s.label}
+            </button>
+          )
+        })}
+      </motion.nav>
+
       <motion.div variants={fadeUp} className="flex gap-8">
-        {/* Sidebar nav */}
-        <nav className="w-[200px] shrink-0 space-y-1 p-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+        {/* Desktop sidebar nav */}
+        <nav className="hidden md:block w-[200px] shrink-0 space-y-1 p-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
           {sections.map((s) => {
             const Icon = s.icon
             return (

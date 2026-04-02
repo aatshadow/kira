@@ -27,13 +27,13 @@ export function ProfileSettings() {
       <div className="space-y-4">
         <div>
           <Label className="text-xs text-muted-foreground mb-1.5 block">Nombre</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm bg-secondary" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm bg-white/[0.06] border-white/[0.1] rounded-xl" />
         </div>
         <div>
           <Label className="text-xs text-muted-foreground mb-1.5 block">Email</Label>
-          <Input value={user?.email || ''} disabled className="max-w-sm bg-secondary opacity-60" />
+          <Input value={user?.email || ''} disabled className="max-w-sm bg-white/[0.06] border-white/[0.1] rounded-xl opacity-60" />
         </div>
-        <Button onClick={handleSave} disabled={saving} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC]">
+        <Button onClick={handleSave} disabled={saving} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] rounded-2xl">
           {saving ? 'Guardando...' : 'Guardar cambios'}
         </Button>
       </div>

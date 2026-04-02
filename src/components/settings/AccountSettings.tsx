@@ -45,17 +45,17 @@ export function AccountSettings() {
         <div className="max-w-sm space-y-3">
           <div>
             <Label className="text-xs text-muted-foreground mb-1.5 block">Contraseña actual</Label>
-            <Input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className="bg-secondary" />
+            <Input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className="bg-white/[0.06] border-white/[0.1] rounded-xl" />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground mb-1.5 block">Nueva contraseña</Label>
-            <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="bg-secondary" />
+            <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="bg-white/[0.06] border-white/[0.1] rounded-xl" />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground mb-1.5 block">Confirmar</Label>
-            <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="bg-secondary" />
+            <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="bg-white/[0.06] border-white/[0.1] rounded-xl" />
           </div>
-          <Button onClick={handleChangePassword} disabled={saving || !newPw || newPw !== confirmPw} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC]">
+          <Button onClick={handleChangePassword} disabled={saving || !newPw || newPw !== confirmPw} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] rounded-2xl">
             {saving ? 'Cambiando...' : 'Cambiar contraseña'}
           </Button>
         </div>
@@ -63,15 +63,15 @@ export function AccountSettings() {
 
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Sesión</h2>
-        <Button variant="secondary" onClick={handleLogout}>Cerrar sesión</Button>
+        <Button variant="secondary" onClick={handleLogout} className="rounded-2xl">Cerrar sesión</Button>
       </div>
 
-      <div className="border-t border-destructive/20 pt-6 space-y-4">
+      <div className="border-t border-white/[0.06] pt-6 space-y-4">
         <h2 className="text-lg font-semibold text-destructive">Zona peligrosa</h2>
         <p className="text-xs text-muted-foreground">Escribe ELIMINAR para confirmar la eliminación de todos tus datos.</p>
         <div className="flex gap-2 max-w-sm">
-          <Input placeholder="ELIMINAR" value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} className="bg-secondary" />
-          <Button variant="destructive" disabled={deleteConfirm !== 'ELIMINAR'} className="border border-destructive/40">
+          <Input placeholder="ELIMINAR" value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} className="bg-white/[0.06] border-white/[0.1] rounded-xl" />
+          <Button variant="destructive" disabled={deleteConfirm !== 'ELIMINAR'} className="border border-destructive/40 rounded-2xl">
             Eliminar datos
           </Button>
         </div>

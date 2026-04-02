@@ -41,7 +41,7 @@ export function CategoriesSettings() {
       <h2 className="text-lg font-semibold">Categorías</h2>
       <div className="space-y-2">
         {categories.map((cat) => (
-          <div key={cat.id} className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-secondary transition-colors">
+          <div key={cat.id} className="flex items-center justify-between py-2 px-3 hover:bg-white/[0.05] rounded-xl transition-colors">
             <div className="flex items-center gap-2">
               <span className="text-sm text-foreground">{cat.name}</span>
               {cat.is_default && <Badge variant="secondary" className="text-[10px]">DEFAULT</Badge>}
@@ -55,8 +55,8 @@ export function CategoriesSettings() {
         ))}
       </div>
       <div className="flex gap-2 max-w-sm">
-        <Input placeholder="Nueva categoría" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} className="bg-secondary" />
-        <Button onClick={handleAdd} variant="secondary" size="sm"><Plus className="h-4 w-4" /></Button>
+        <Input placeholder="Nueva categoría" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} className="bg-white/[0.06] border-white/[0.1] rounded-xl" />
+        <Button onClick={handleAdd} variant="secondary" size="sm" className="rounded-2xl"><Plus className="h-4 w-4" /></Button>
       </div>
     </div>
   )
