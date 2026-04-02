@@ -1,46 +1,18 @@
 'use client'
 
 import Image from 'next/image'
-import { Bot, Plug, CircleDot, Plus } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Bot, Plug, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { fadeUp, staggerContainer } from '@/lib/animations'
 
 const PLANNED_AGENTS = [
-  {
-    name: 'Google Calendar',
-    description: 'Crear, editar y consultar eventos del calendario',
-    status: 'active' as const,
-    icon: '📅',
-  },
-  {
-    name: 'Gmail',
-    description: 'Leer, enviar y gestionar correos electrónicos',
-    status: 'planned' as const,
-    icon: '📧',
-  },
-  {
-    name: 'Notion',
-    description: 'Gestionar documentos, bases de datos y wikis',
-    status: 'planned' as const,
-    icon: '📝',
-  },
-  {
-    name: 'WhatsApp',
-    description: 'Enviar mensajes y consultar conversaciones',
-    status: 'planned' as const,
-    icon: '💬',
-  },
-  {
-    name: 'Calendly',
-    description: 'Gestionar disponibilidad y agendar meetings',
-    status: 'planned' as const,
-    icon: '🗓️',
-  },
-  {
-    name: 'Slack',
-    description: 'Enviar mensajes y gestionar canales',
-    status: 'planned' as const,
-    icon: '💼',
-  },
+  { name: 'Google Calendar', description: 'Crear, editar y consultar eventos del calendario', status: 'active' as const, icon: '📅' },
+  { name: 'Gmail', description: 'Leer, enviar y gestionar correos electrónicos', status: 'planned' as const, icon: '📧' },
+  { name: 'Notion', description: 'Gestionar documentos, bases de datos y wikis', status: 'planned' as const, icon: '📝' },
+  { name: 'WhatsApp', description: 'Enviar mensajes y consultar conversaciones', status: 'planned' as const, icon: '💬' },
+  { name: 'Calendly', description: 'Gestionar disponibilidad y agendar meetings', status: 'planned' as const, icon: '🗓️' },
+  { name: 'Slack', description: 'Enviar mensajes y gestionar canales', status: 'planned' as const, icon: '💼' },
 ]
 
 const STATUS_COLORS = {
@@ -57,9 +29,14 @@ const STATUS_LABELS = {
 
 export function KiraAgents() {
   return (
-    <div className="h-full overflow-y-auto">
+    <motion.div
+      className="h-full overflow-y-auto"
+      variants={staggerContainer}
+      initial="hidden"
+      animate="show"
+    >
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <motion.div variants={fadeUp} className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Agentes & Integraciones</h2>
           <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -74,10 +51,10 @@ export function KiraAgents() {
           <Plus className="h-3.5 w-3.5 mr-1" />
           Añadir agente
         </Button>
-      </div>
+      </motion.div>
 
       {/* Architecture info */}
-      <div className="rounded-lg border border-border bg-card/50 p-4 mb-6">
+      <motion.div variants={fadeUp} className="rounded-lg border border-border bg-card/50 p-4 mb-6">
         <div className="flex items-start gap-3">
           <div className="h-10 w-10 rounded-lg bg-[rgba(0,212,255,0.08)] flex items-center justify-center shrink-0">
             <Image src="/logo.png" alt="KIRA" width={24} height={24} className="rounded-full" />
@@ -89,14 +66,18 @@ export function KiraAgents() {
             </p>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Agent grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {PLANNED_AGENTS.map((agent) => (
-          <div
+      <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {PLANNED_AGENTS.map((agent, i) => (
+          <motion.div
             key={agent.name}
-            className="rounded-lg border border-border bg-card/50 p-4 hover:border-border/80 transition-colors"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.2 + i * 0.06, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ y: -2, borderColor: 'rgba(0,212,255,0.2)' }}
+            className="rounded-lg border border-border bg-card/50 p-4 transition-colors cursor-default"
           >
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2.5">
@@ -116,13 +97,20 @@ export function KiraAgents() {
               <span className="text-[10px] text-muted-foreground">
                 {agent.status === 'active' ? 'Conectado via OAuth' : 'MCP Server requerido'}
               </span>
+              {agent.status === 'active' && (
+                <motion.span
+                  className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400"
+                  animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              )}
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* How it works */}
-      <div className="mt-6 rounded-lg border border-dashed border-border p-4">
+      <motion.div variants={fadeUp} className="mt-6 rounded-lg border border-dashed border-border p-4">
         <h3 className="text-xs font-medium text-foreground mb-3 flex items-center gap-1.5">
           <Bot className="h-3.5 w-3.5 text-[#00D4FF]" />
           Cómo funciona
@@ -133,16 +121,22 @@ export function KiraAgents() {
             { step: '2', text: 'KIRA detecta qué agente necesita para tu petición' },
             { step: '3', text: 'Ejecuta la acción y te confirma el resultado' },
             { step: '4', text: 'Puedes monitorizar todo desde este panel' },
-          ].map((item) => (
-            <div key={item.step} className="flex items-center gap-2">
+          ].map((item, i) => (
+            <motion.div
+              key={item.step}
+              className="flex items-center gap-2"
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.5 + i * 0.08 }}
+            >
               <div className="h-5 w-5 rounded-full bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
                 <span className="text-[10px] font-bold text-[#00D4FF]">{item.step}</span>
               </div>
               <p className="text-[11px] text-muted-foreground">{item.text}</p>
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }

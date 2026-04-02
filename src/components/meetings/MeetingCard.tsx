@@ -1,5 +1,6 @@
 'use client'
 
+import { motion } from 'framer-motion'
 import { Calendar, Clock, Users, MoreHorizontal, FileText, Sparkles, Video } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -36,13 +37,22 @@ const statusLabels: Record<string, string> = {
 
 export function MeetingCard({ meeting, onEdit, onComplete, onCancel, onDelete }: MeetingCardProps) {
   return (
-    <div
-      className="group flex items-center gap-4 p-4 rounded-lg border border-border hover:border-muted-foreground/30 bg-card transition-all cursor-pointer"
+    <motion.div
+      className="group flex items-center gap-4 p-4 rounded-lg border border-border hover:border-[rgba(0,212,255,0.15)] bg-card transition-colors cursor-pointer"
       onClick={() => onEdit(meeting)}
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.99 }}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <h3 className="text-sm font-medium text-foreground truncate">{meeting.title}</h3>
+          {meeting.status === 'in_progress' && (
+            <motion.span
+              className="h-2 w-2 rounded-full bg-[#00D4FF]"
+              animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+          )}
           <Badge variant="outline" className={`text-[10px] ${statusColors[meeting.status]}`}>
             {statusLabels[meeting.status]}
           </Badge>
@@ -124,6 +134,6 @@ export function MeetingCard({ meeting, onEdit, onComplete, onCancel, onDelete }:
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </motion.div>
   )
 }

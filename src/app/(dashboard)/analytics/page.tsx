@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Clock, CheckCircle, BarChart3, Zap, Video, Target,
   Calendar, Users, User, TrendingUp, Timer, ListChecks,
@@ -825,55 +826,96 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="py-8">
+    <motion.div
+      className="py-8 relative"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      {/* Ambient glow */}
+      <div className="absolute top-0 right-0 w-[200px] h-[200px] rounded-full bg-[rgba(0,212,255,0.03)] blur-[80px] pointer-events-none" />
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <motion.div
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      >
         <h1 className="text-xl font-bold text-foreground">Analytics</h1>
 
         <div className="flex items-center gap-3">
-          {/* Date range selector */}
-          <div className="flex items-center border border-border rounded-md overflow-hidden">
+          <div className="flex items-center bg-secondary rounded-md overflow-hidden p-0.5">
             {ranges.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setRange(r.id)}
                 className={cn(
-                  'px-3 py-1.5 text-xs transition-colors cursor-pointer',
+                  'relative px-3 py-1.5 text-xs transition-colors cursor-pointer rounded-sm z-10',
                   range === r.id
-                    ? 'bg-[rgba(0,212,255,0.08)] text-[#00D4FF]'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    ? 'text-[#00D4FF]'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                {r.label}
+                {range === r.id && (
+                  <motion.div
+                    layoutId="analytics-range"
+                    className="absolute inset-0 bg-[rgba(0,212,255,0.08)] rounded-sm"
+                    transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">{r.label}</span>
               </button>
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Tab bar */}
-      <div className="bg-secondary rounded-lg p-1 flex gap-1 mb-6">
+      <motion.div
+        className="bg-secondary rounded-lg p-1 flex gap-1 mb-6"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+      >
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'flex-1 px-4 py-2 rounded-md text-xs font-medium transition-all cursor-pointer',
+              'relative flex-1 px-4 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer z-10',
               activeTab === tab.id
-                ? 'bg-card text-[#00D4FF] shadow-sm border border-border'
+                ? 'text-[#00D4FF]'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            {tab.label}
+            {activeTab === tab.id && (
+              <motion.div
+                layoutId="analytics-tab"
+                className="absolute inset-0 bg-card rounded-md shadow-sm border border-border"
+                transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10">{tab.label}</span>
           </button>
         ))}
-      </div>
+      </motion.div>
 
       {/* Tab content */}
-      {activeTab === 'overview' && <OverviewTab data={data} />}
-      {activeTab === 'tasks' && <TasksTab data={data} />}
-      {activeTab === 'meetings' && <MeetingsTab data={data} />}
-      {activeTab === 'habits' && <HabitsTab data={data} />}
-    </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10, transition: { duration: 0.12 } }}
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {activeTab === 'overview' && <OverviewTab data={data} />}
+          {activeTab === 'tasks' && <TasksTab data={data} />}
+          {activeTab === 'meetings' && <MeetingsTab data={data} />}
+          {activeTab === 'habits' && <HabitsTab data={data} />}
+        </motion.div>
+      </AnimatePresence>
+    </motion.div>
   )
 }

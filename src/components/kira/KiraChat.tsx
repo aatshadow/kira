@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Loader2, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2, X } from 'lucide-react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
@@ -313,20 +314,30 @@ export function KiraChat() {
               </p>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                 {SUGGESTIONS.map((s, i) => (
-                  <button
+                  <motion.button
                     key={i}
                     onClick={() => sendMessage(s)}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.3 + i * 0.06 }}
+                    whileTap={{ scale: 0.95 }}
                     className="text-[11px] px-3 py-1.5 rounded-full border border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-[#00D4FF]/30 transition-colors cursor-pointer"
                   >
                     {s}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </div>
           ) : (
             <>
               {messages.map((msg, i) => (
-                <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                <motion.div
+                  key={i}
+                  className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}
+                  initial={{ opacity: 0, y: 8, x: msg.role === 'user' ? 10 : -10 }}
+                  animate={{ opacity: 1, y: 0, x: 0 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                >
                   <div
                     className={cn(
                       'max-w-[85%] md:max-w-[75%] rounded-2xl px-3.5 md:px-4 py-2.5 text-sm',
@@ -354,17 +365,25 @@ export function KiraChat() {
                       </div>
                     )}
                   </div>
-                </div>
+                </motion.div>
               ))}
               {loading && (
-                <div className="flex justify-start">
+                <motion.div
+                  className="flex justify-start"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
                   <div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#00D4FF]" />
+                      <motion.div
+                        className="h-2 w-2 rounded-full bg-[#00D4FF]"
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      />
                       <span className="text-xs text-muted-foreground">KIRA está pensando...</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               )}
               <div ref={messagesEndRef} />
             </>
@@ -381,7 +400,7 @@ export function KiraChat() {
               onKeyDown={handleKeyDown}
               placeholder="Escríbele a KIRA..."
               rows={1}
-              className="w-full resize-none rounded-xl border border-border bg-secondary px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00D4FF]/50 focus:border-[#00D4FF]/50"
+              className="w-full resize-none rounded-xl border border-border bg-secondary px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00D4FF]/50 focus:border-[rgba(0,212,255,0.3)] focus:shadow-[0_0_12px_rgba(0,212,255,0.15)] transition-shadow"
               style={{ minHeight: '48px', maxHeight: '120px' }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement

@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { Plus, Search, List, Columns3, LayoutGrid, Calendar, FolderKanban, Layers } from 'lucide-react'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,8 @@ import { useTasks } from '@/lib/hooks/useTasks'
 import { useTaskStore, type DateRange } from '@/stores/taskStore'
 import { useUIStore } from '@/stores/uiStore'
 import { DayStrip } from '@/components/management/DayStrip'
+import { PageWrapper } from '@/components/shared/PageWrapper'
+import { fadeUp } from '@/lib/animations'
 import { cn } from '@/lib/utils'
 
 const viewIcons = {
@@ -28,26 +31,15 @@ function getDateRangeBounds(range: DateRange): { start: Date; end: Date } | null
   if (!range) return null
   const now = new Date()
   switch (range) {
-    case 'today':
-      return { start: startOfDay(now), end: endOfDay(now) }
-    case 'tomorrow':
-      return { start: startOfDay(addDays(now, 1)), end: endOfDay(addDays(now, 1)) }
-    case 'yesterday':
-      return { start: startOfDay(addDays(now, -1)), end: endOfDay(addDays(now, -1)) }
-    case 'this_week':
-      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) }
-    case 'next_week': {
-      const nextWeekStart = addDays(startOfWeek(now, { weekStartsOn: 1 }), 7)
-      return { start: nextWeekStart, end: endOfWeek(nextWeekStart, { weekStartsOn: 1 }) }
-    }
-    case 'this_month':
-      return { start: startOfMonth(now), end: endOfMonth(now) }
-    case 'overdue':
-      return { start: new Date(0), end: startOfDay(now) }
-    case 'no_date':
-      return null // handled specially
-    default:
-      return null
+    case 'today': return { start: startOfDay(now), end: endOfDay(now) }
+    case 'tomorrow': return { start: startOfDay(addDays(now, 1)), end: endOfDay(addDays(now, 1)) }
+    case 'yesterday': return { start: startOfDay(addDays(now, -1)), end: endOfDay(addDays(now, -1)) }
+    case 'this_week': return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) }
+    case 'next_week': { const s = addDays(startOfWeek(now, { weekStartsOn: 1 }), 7); return { start: s, end: endOfWeek(s, { weekStartsOn: 1 }) } }
+    case 'this_month': return { start: startOfMonth(now), end: endOfMonth(now) }
+    case 'overdue': return { start: new Date(0), end: startOfDay(now) }
+    case 'no_date': return null
+    default: return null
   }
 }
 
@@ -60,12 +52,7 @@ export default function ManagementTasksPage() {
 
   const filteredTasks = useMemo(() => {
     let result = tasks.filter((t) => t.status !== 'deleted')
-
-    // By default hide completed tasks unless user explicitly filters for 'done'
-    if (filters.status.length === 0) {
-      result = result.filter((t) => t.status !== 'done')
-    }
-
+    if (filters.status.length === 0) result = result.filter((t) => t.status !== 'done')
     if (filters.status.length > 0) {
       if (filters.status.includes('overdue')) {
         result = result.filter((t) => t.due_date && t.due_date < today && t.status !== 'done')
@@ -76,8 +63,6 @@ export default function ManagementTasksPage() {
     if (filters.category.length > 0) result = result.filter((t) => t.category_id && filters.category.includes(t.category_id))
     if (filters.project) result = result.filter((t) => t.project_id === filters.project)
     if (filters.priority.length > 0) result = result.filter((t) => t.priority && filters.priority.includes(t.priority))
-
-    // Date range filter
     if (filters.dateRange === 'no_date') {
       result = result.filter((t) => !t.due_date)
     } else if (filters.dateRange) {
@@ -86,15 +71,10 @@ export default function ManagementTasksPage() {
         if (filters.dateRange === 'overdue') {
           result = result.filter((t) => t.due_date && new Date(t.due_date) < bounds.end && t.status !== 'done')
         } else {
-          result = result.filter((t) => {
-            if (!t.due_date) return false
-            const d = new Date(t.due_date)
-            return d >= bounds.start && d <= bounds.end
-          })
+          result = result.filter((t) => { if (!t.due_date) return false; const d = new Date(t.due_date); return d >= bounds.start && d <= bounds.end })
         }
       }
     }
-
     if (filters.search) {
       const q = filters.search.toLowerCase()
       result = result.filter((t) => t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.tags?.some((tag) => tag.toLowerCase().includes(q)))
@@ -135,24 +115,42 @@ export default function ManagementTasksPage() {
   }
 
   return (
-    <div>
+    <PageWrapper>
       <DayStrip />
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <Button onClick={() => openModal('task-create')} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] hover:shadow-[0_0_8px_rgba(0,212,255,0.4)]">
-          <Plus className="h-4 w-4 mr-1" /> Nueva task
-        </Button>
-        <div className="flex items-center border border-border rounded-md overflow-hidden">
+      <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-3 mb-6">
+        <motion.div whileTap={{ scale: 0.97 }}>
+          <Button onClick={() => openModal('task-create')} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] hover:shadow-[0_0_8px_rgba(0,212,255,0.4)]">
+            <Plus className="h-4 w-4 mr-1" /> Nueva task
+          </Button>
+        </motion.div>
+
+        {/* View toggle with sliding indicator */}
+        <div className="flex items-center bg-secondary rounded-md overflow-hidden p-0.5">
           {(Object.keys(viewIcons) as Array<keyof typeof viewIcons>).map((v) => {
             const Icon = viewIcons[v]
             return (
-              <button key={v} onClick={() => setView(v)} className={cn('p-2 transition-colors cursor-pointer', view === v ? 'bg-[rgba(0,212,255,0.08)] text-[#00D4FF]' : 'text-muted-foreground hover:text-foreground hover:bg-secondary')} title={viewLabels[v]}>
-                <Icon className="h-4 w-4" />
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn(
+                  'relative p-2 transition-colors cursor-pointer rounded-sm',
+                  view === v ? 'text-[#00D4FF]' : 'text-muted-foreground hover:text-foreground'
+                )}
+                title={viewLabels[v]}
+              >
+                {view === v && (
+                  <motion.div
+                    layoutId="task-view"
+                    className="absolute inset-0 bg-[rgba(0,212,255,0.08)] rounded-sm"
+                    transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <Icon className="h-4 w-4 relative z-10" />
               </button>
             )
           })}
         </div>
 
-        {/* Date range filter */}
         <Select value={filters.dateRange || 'all'} onValueChange={(v) => setFilter('dateRange', v === 'all' ? '' : v as DateRange)}>
           <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Fecha" /></SelectTrigger>
           <SelectContent>
@@ -191,7 +189,6 @@ export default function ManagementTasksPage() {
           </SelectContent>
         </Select>
 
-        {/* Project filter */}
         {projects.length > 0 && (
           <Select value={filters.project || 'all'} onValueChange={(v) => setFilter('project', !v || v === 'all' ? '' : v)}>
             <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Proyecto" /></SelectTrigger>
@@ -208,20 +205,22 @@ export default function ManagementTasksPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input placeholder="Buscar..." value={filters.search} onChange={(e) => setFilter('search', e.target.value)} className="pl-9 h-9 w-[200px] text-xs bg-secondary" />
         </div>
-      </div>
+      </motion.div>
 
-      {filteredTasks.length === 0 ? (
-        <EmptyState icon={List} title="Tu backlog está vacío" description="Añade tasks para empezar a gestionar tu tiempo" actionLabel="+ Nueva task" onAction={() => openModal('task-create')} />
-      ) : (
-        <>
-          {view === 'list' && <TaskList tasks={filteredTasks} />}
-          {view === 'kanban' && <TaskKanban tasks={filteredTasks} />}
-          {view === 'feed' && <TaskFeed tasks={filteredTasks} />}
-          {view === 'calendar' && <TaskCalendar tasks={filteredTasks} />}
-          {view === 'category' && renderGroupedView('category')}
-          {view === 'project' && renderGroupedView('project')}
-        </>
-      )}
-    </div>
+      <motion.div variants={fadeUp}>
+        {filteredTasks.length === 0 ? (
+          <EmptyState icon={List} title="Tu backlog está vacío" description="Añade tasks para empezar a gestionar tu tiempo" actionLabel="+ Nueva task" onAction={() => openModal('task-create')} />
+        ) : (
+          <>
+            {view === 'list' && <TaskList tasks={filteredTasks} />}
+            {view === 'kanban' && <TaskKanban tasks={filteredTasks} />}
+            {view === 'feed' && <TaskFeed tasks={filteredTasks} />}
+            {view === 'calendar' && <TaskCalendar tasks={filteredTasks} />}
+            {view === 'category' && renderGroupedView('category')}
+            {view === 'project' && renderGroupedView('project')}
+          </>
+        )}
+      </motion.div>
+    </PageWrapper>
   )
 }

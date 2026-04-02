@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { Plus, Check, Flame, Repeat, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PageWrapper } from '@/components/shared/PageWrapper'
+import { fadeUp } from '@/lib/animations'
 import { cn } from '@/lib/utils'
 import { DayStrip } from '@/components/management/DayStrip'
 import { createClient } from '@/lib/supabase/client'
@@ -45,63 +48,39 @@ export default function HabitsPage() {
     const supabase = createClient()
     const userId = await getUserId()
     if (!userId) return
-
     const [habitsRes, logsRes] = await Promise.all([
       supabase.from('habits').select('*').eq('user_id', userId).order('created_at'),
       supabase.from('habit_logs').select('*').eq('user_id', userId).gte('completed_at', subDays(new Date(), 30).toISOString()),
     ])
-
     if (habitsRes.data) setHabits(habitsRes.data)
     if (logsRes.data) setLogs(logsRes.data)
   }, [])
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const createHabit = async () => {
     if (!newName.trim()) return
     const supabase = createClient()
     const userId = await getUserId()
     if (!userId) return
-
     await supabase.from('habits').insert({
-      user_id: userId,
-      name: newName.trim(),
-      frequency: newFrequency,
-      target_time: newTime || null,
-      duration_mins: newDuration ? parseInt(newDuration) : null,
-      streak: 0,
+      user_id: userId, name: newName.trim(), frequency: newFrequency,
+      target_time: newTime || null, duration_mins: newDuration ? parseInt(newDuration) : null, streak: 0,
     })
-
-    setNewName('')
-    setNewTime('')
-    setNewDuration('')
-    setShowCreate(false)
-    fetchData()
+    setNewName(''); setNewTime(''); setNewDuration(''); setShowCreate(false); fetchData()
   }
 
   const toggleHabitToday = async (habit: Habit) => {
     const supabase = createClient()
     const userId = await getUserId()
     if (!userId) return
-
     const today = new Date()
-    const existingLog = logs.find(
-      (l) => l.habit_id === habit.id && isSameDay(new Date(l.completed_at), today)
-    )
-
+    const existingLog = logs.find((l) => l.habit_id === habit.id && isSameDay(new Date(l.completed_at), today))
     if (existingLog) {
       await supabase.from('habit_logs').delete().eq('id', existingLog.id)
     } else {
-      await supabase.from('habit_logs').insert({
-        user_id: userId,
-        habit_id: habit.id,
-        completed_at: new Date().toISOString(),
-        duration_mins: habit.duration_mins,
-      })
+      await supabase.from('habit_logs').insert({ user_id: userId, habit_id: habit.id, completed_at: new Date().toISOString(), duration_mins: habit.duration_mins })
     }
-
     fetchData()
   }
 
@@ -118,67 +97,50 @@ export default function HabitsPage() {
 
   const getStreak = (habitId: string) => {
     let streak = 0
-    const habitLogs = logs
-      .filter((l) => l.habit_id === habitId)
-      .map((l) => new Date(l.completed_at))
-      .sort((a, b) => b.getTime() - a.getTime())
-
+    const habitLogs = logs.filter((l) => l.habit_id === habitId).map((l) => new Date(l.completed_at)).sort((a, b) => b.getTime() - a.getTime())
     let checkDate = new Date()
-    // If not completed today, start checking from yesterday
-    if (!isCompletedToday(habitId)) {
-      checkDate = subDays(checkDate, 1)
-    }
-
+    if (!isCompletedToday(habitId)) checkDate = subDays(checkDate, 1)
     for (let i = 0; i < 365; i++) {
-      const found = habitLogs.some((d) => isSameDay(d, checkDate))
-      if (found) {
-        streak++
-        checkDate = subDays(checkDate, 1)
-      } else {
-        break
-      }
+      if (habitLogs.some((d) => isSameDay(d, checkDate))) { streak++; checkDate = subDays(checkDate, 1) } else break
     }
     return streak
   }
 
-  // Last 7 days for heatmap
   const last7Days = Array.from({ length: 7 }, (_, i) => subDays(new Date(), 6 - i))
 
   return (
-    <div>
+    <PageWrapper>
       <DayStrip />
-      <div className="flex items-center justify-between mb-6">
+      <motion.div variants={fadeUp} className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-foreground">Hábitos</h2>
-        <Button
-          onClick={() => setShowCreate(true)}
-          className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] hover:shadow-[0_0_8px_rgba(0,212,255,0.4)]"
-        >
-          <Plus className="h-4 w-4 mr-1" /> Nuevo hábito
-        </Button>
-      </div>
+        <motion.div whileTap={{ scale: 0.97 }}>
+          <Button onClick={() => setShowCreate(true)} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] hover:shadow-[0_0_8px_rgba(0,212,255,0.4)]">
+            <Plus className="h-4 w-4 mr-1" /> Nuevo hábito
+          </Button>
+        </motion.div>
+      </motion.div>
 
       {habits.length === 0 ? (
-        <EmptyState
-          icon={Repeat}
-          title="Sin hábitos todavía"
-          description="Crea hábitos diarios o semanales para construir rutinas productivas"
-          actionLabel="+ Nuevo hábito"
-          onAction={() => setShowCreate(true)}
-        />
+        <motion.div variants={fadeUp}>
+          <EmptyState icon={Repeat} title="Sin hábitos todavía" description="Crea hábitos diarios o semanales para construir rutinas productivas" actionLabel="+ Nuevo hábito" onAction={() => setShowCreate(true)} />
+        </motion.div>
       ) : (
-        <div className="space-y-3">
-          {habits.map((habit) => {
+        <motion.div variants={fadeUp} className="space-y-3">
+          {habits.map((habit, i) => {
             const completed = isCompletedToday(habit.id)
             const streak = getStreak(habit.id)
             return (
-              <div
+              <motion.div
                 key={habit.id}
-                className="group rounded-lg border border-border bg-card p-3 md:p-4 hover:border-border/80 transition-colors"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+                className="group rounded-lg border border-border bg-card p-3 md:p-4 hover:border-[rgba(0,212,255,0.15)] transition-colors"
               >
                 <div className="flex items-center gap-4">
-                  {/* Check button */}
-                  <button
+                  <motion.button
                     onClick={() => toggleHabitToday(habit)}
+                    whileTap={{ scale: 0.85 }}
                     className={cn(
                       'h-8 w-8 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0',
                       completed
@@ -187,52 +149,45 @@ export default function HabitsPage() {
                     )}
                   >
                     {completed && <Check className="h-4 w-4" />}
-                  </button>
+                  </motion.button>
 
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className={cn('text-sm font-medium', completed && 'text-muted-foreground line-through')}>
-                      {habit.name}
-                    </p>
+                    <p className={cn('text-sm font-medium', completed && 'text-muted-foreground line-through')}>{habit.name}</p>
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="text-[10px] text-muted-foreground capitalize">{habit.frequency}</span>
-                      {habit.target_time && (
-                        <span className="text-[10px] text-muted-foreground">{habit.target_time}</span>
-                      )}
-                      {habit.duration_mins && (
-                        <span className="text-[10px] text-muted-foreground">{habit.duration_mins}min</span>
-                      )}
+                      {habit.target_time && <span className="text-[10px] text-muted-foreground">{habit.target_time}</span>}
+                      {habit.duration_mins && <span className="text-[10px] text-muted-foreground">{habit.duration_mins}min</span>}
                     </div>
                   </div>
 
-                  {/* Streak */}
                   {streak > 0 && (
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/10">
+                    <motion.div
+                      className="flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/10"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring' as const, stiffness: 300, damping: 20 }}
+                    >
                       <Flame className="h-3 w-3 text-orange-500" />
                       <span className="text-[11px] font-medium text-orange-500">{streak}</span>
-                    </div>
+                    </motion.div>
                   )}
 
-                  {/* Mini heatmap (last 7 days) */}
                   <div className="hidden md:flex items-center gap-0.5">
-                    {last7Days.map((day) => {
-                      const done = logs.some(
-                        (l) => l.habit_id === habit.id && isSameDay(new Date(l.completed_at), day)
-                      )
+                    {last7Days.map((day, j) => {
+                      const done = logs.some((l) => l.habit_id === habit.id && isSameDay(new Date(l.completed_at), day))
                       return (
-                        <div
+                        <motion.div
                           key={day.toISOString()}
                           title={format(day, 'EEE d', { locale: es })}
-                          className={cn(
-                            'h-4 w-4 rounded-sm',
-                            done ? 'bg-[#00D4FF]' : 'bg-secondary'
-                          )}
+                          className={cn('h-4 w-4 rounded-sm', done ? 'bg-[#00D4FF]' : 'bg-secondary')}
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ duration: 0.2, delay: 0.3 + j * 0.04 }}
                         />
                       )
                     })}
                   </div>
 
-                  {/* Delete */}
                   <button
                     onClick={() => deleteHabit(habit.id)}
                     className="p-1.5 rounded hover:bg-destructive/20 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
@@ -240,33 +195,21 @@ export default function HabitsPage() {
                     <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
             )
           })}
-        </div>
+        </motion.div>
       )}
 
-      {/* Create modal */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="sm:max-w-[400px] bg-card border-border">
-          <DialogHeader>
-            <DialogTitle>Nuevo hábito</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Nuevo hábito</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div>
-              <Input
-                autoFocus
-                placeholder="Nombre del hábito"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-            </div>
+            <Input autoFocus placeholder="Nombre del hábito" value={newName} onChange={(e) => setNewName(e.target.value)} />
             <div>
               <Label className="text-xs text-muted-foreground mb-1.5 block">Frecuencia</Label>
               <Select value={newFrequency} onValueChange={(v) => setNewFrequency(v || 'daily')}>
-                <SelectTrigger className="bg-secondary">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="bg-secondary"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">Diario</SelectItem>
                   <SelectItem value="weekly">Semanal</SelectItem>
@@ -287,12 +230,10 @@ export default function HabitsPage() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancelar</Button>
-            <Button onClick={createHabit} disabled={!newName.trim()} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC]">
-              Crear hábito
-            </Button>
+            <Button onClick={createHabit} disabled={!newName.trim()} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC]">Crear hábito</Button>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageWrapper>
   )
 }
