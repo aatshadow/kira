@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Clock, User, LayoutGrid, ChevronDown, Home, FolderKanban, Bot, BarChart3, Settings, Calendar, ListTodo, Users, Repeat } from 'lucide-react'
@@ -11,6 +10,7 @@ import { useTimerStore } from '@/stores/timerStore'
 import { useUIStore } from '@/stores/uiStore'
 import { formatTime } from '@/lib/utils/time'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { KiraLogo } from '@/components/shared/KiraLogo'
 
 const navLinks = [
   { href: '/', label: 'Consola Central', icon: Home },
@@ -66,9 +66,9 @@ export function TopBar() {
     >
       {/* Mobile: floating pill header */}
       <div className="md:hidden mx-3" style={{ marginTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
-        <div className="flex h-12 items-center justify-between px-4 rounded-2xl border border-border/50 bg-background/90 backdrop-blur-xl shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
+        <div className="flex h-12 items-center justify-between px-4 glass-card">
           <Link href="/" className="shrink-0 flex items-center gap-1.5">
-            <Image src="/logo.png" alt="KIRA" width={20} height={20} className="rounded-full" />
+            <KiraLogo size="sm" />
             <span className="text-xs font-bold tracking-[0.12em] text-foreground">KIRA</span>
           </Link>
 
@@ -184,7 +184,7 @@ export function TopBar() {
       {/* Desktop: classic header */}
       <div className="hidden md:flex h-14 items-center px-6 lg:px-10 max-w-[1400px] mx-auto">
         <Link href="/" className="mr-8 shrink-0 flex items-center gap-2">
-          <Image src="/logo.png" alt="KIRA" width={24} height={24} className="rounded-full" />
+          <KiraLogo size="sm" />
           <span className="text-sm font-bold tracking-[0.15em] text-foreground">KIRA</span>
         </Link>
 

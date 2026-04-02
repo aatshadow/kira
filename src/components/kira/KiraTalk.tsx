@@ -1,19 +1,13 @@
 'use client'
 
-import Image from 'next/image'
 import { Mic, Radio } from 'lucide-react'
+import { KiraLogo } from '@/components/shared/KiraLogo'
 
 export function KiraTalk() {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center">
       <div className="relative mb-8">
-        <Image
-          src="/logo.png"
-          alt="KIRA"
-          width={120}
-          height={120}
-          className="rounded-full"
-        />
+        <KiraLogo size="xl" />
         <div className="absolute inset-0 rounded-full border-2 border-[#00D4FF]/20 animate-ping" />
         <div className="absolute inset-[-8px] rounded-full border border-[#00D4FF]/10" />
       </div>

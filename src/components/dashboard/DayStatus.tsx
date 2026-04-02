@@ -15,7 +15,7 @@ interface DayStatusProps {
 }
 
 function ProgressRing({ progress, totalLabel, goalLabel }: { progress: number; totalLabel: string; goalLabel: string }) {
-  const size = 148
+  const size = 160
   const stroke = 7
   const radius = (size - stroke) / 2
   const circumference = radius * 2 * Math.PI
@@ -151,14 +151,14 @@ export function DayStatus({ dailyGoalHours, calendarEventsMins = 0 }: DayStatusP
 
   return (
     <motion.div
-      className="relative overflow-hidden rounded-2xl px-5 py-6 md:px-8 md:py-8"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="glass-elevated relative overflow-hidden p-6 md:p-8"
+      initial={{ opacity: 0, y: 20, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring' as const, stiffness: 260, damping: 24 }}
     >
       {/* Ambient glow background */}
       <div className="absolute inset-0 kira-hero-gradient pointer-events-none" />
-      <div className="absolute top-0 right-0 w-[200px] h-[200px] rounded-full bg-[rgba(0,212,255,0.03)] blur-[80px] pointer-events-none" />
+      <div className="absolute -top-20 -right-20 w-[240px] h-[240px] rounded-full bg-[rgba(0,212,255,0.04)] blur-[100px] pointer-events-none" />
 
       <div className="relative">
         {/* Greeting */}
@@ -174,17 +174,22 @@ export function DayStatus({ dailyGoalHours, calendarEventsMins = 0 }: DayStatusP
 
         {/* Ring + Stats */}
         <div className="flex items-center gap-6 md:gap-10">
-          <ProgressRing
-            progress={progress}
-            totalLabel={totalLabel}
-            goalLabel={`${dailyGoalHours}h`}
-          />
+          <div className="relative">
+            <ProgressRing
+              progress={progress}
+              totalLabel={totalLabel}
+              goalLabel={`${dailyGoalHours}h`}
+            />
+            {/* Breathing halo */}
+            <div className="absolute inset-0 rounded-full animate-kira-glow pointer-events-none" style={{ filter: 'blur(20px)', background: 'radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%)' }} />
+          </div>
 
-          <div className="flex-1 space-y-3.5">
+          <div className="flex-1 space-y-2.5">
             {statItems.map((item, i) => (
               <motion.div
                 key={item.label}
-                className="flex items-center justify-between"
+                className="flex items-center justify-between px-3 py-2 rounded-xl"
+                style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.4, delay: 0.4 + i * 0.1 }}

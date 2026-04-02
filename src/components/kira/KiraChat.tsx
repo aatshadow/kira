@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Loader2, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2, X } from 'lucide-react'
-import Image from 'next/image'
+import { KiraLogo } from '@/components/shared/KiraLogo'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTasks } from '@/lib/hooks/useTasks'
@@ -307,7 +307,7 @@ export function KiraChat() {
         <div className="flex-1 overflow-y-auto rounded-lg md:border md:border-border bg-card/30 md:bg-card/50 p-3 md:p-4 space-y-3 md:space-y-4 min-h-0">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <Image src="/logo.png" alt="KIRA" width={48} height={48} className="rounded-2xl mb-3 opacity-60 md:w-16 md:h-16 md:mb-4" />
+              <div className="mb-3 md:mb-4 opacity-80"><KiraLogo size="lg" /></div>
               <h2 className="text-sm font-medium text-foreground mb-1">Hola, soy KIRA</h2>
               <p className="text-xs text-muted-foreground mb-4 md:mb-6 max-w-sm">
                 Puedo crear tasks, meetings, proyectos, categorías, gestionar tu Google Calendar y recordar cosas sobre ti.

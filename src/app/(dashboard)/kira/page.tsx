@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquareText, Mic, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -9,6 +8,7 @@ import { KiraChat } from '@/components/kira/KiraChat'
 import { KiraTalk } from '@/components/kira/KiraTalk'
 import { KiraAgents } from '@/components/kira/KiraAgents'
 import { fadeUp } from '@/lib/animations'
+import { KiraLogo } from '@/components/shared/KiraLogo'
 
 const tabs = [
   { id: 'chat', label: 'Chat', icon: MessageSquareText },
@@ -37,7 +37,7 @@ export default function KiraPage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
-          <Image src="/logo.png" alt="KIRA" width={32} height={32} className="rounded-full" />
+          <KiraLogo size="md" />
           <div>
             <h1 className="text-lg font-bold text-foreground">KIRA</h1>
             <p className="text-[11px] text-muted-foreground">Tu asistente de productividad</p>

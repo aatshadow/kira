@@ -1,10 +1,10 @@
 'use client'
 
-import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { Bot, Plug, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { fadeUp, staggerContainer } from '@/lib/animations'
+import { KiraLogo } from '@/components/shared/KiraLogo'
 
 const PLANNED_AGENTS = [
   { name: 'Google Calendar', description: 'Crear, editar y consultar eventos del calendario', status: 'active' as const, icon: '📅' },
@@ -57,7 +57,7 @@ export function KiraAgents() {
       <motion.div variants={fadeUp} className="rounded-lg border border-border bg-card/50 p-4 mb-6">
         <div className="flex items-start gap-3">
           <div className="h-10 w-10 rounded-lg bg-[rgba(0,212,255,0.08)] flex items-center justify-center shrink-0">
-            <Image src="/logo.png" alt="KIRA" width={24} height={24} className="rounded-full" />
+            <KiraLogo size="sm" />
           </div>
           <div>
             <p className="text-xs font-medium text-foreground mb-1">KIRA como COO</p>

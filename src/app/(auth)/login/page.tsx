@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import { KiraLogo } from '@/components/shared/KiraLogo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
@@ -76,7 +76,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm px-6">
         {/* Logo */}
         <div className="text-center mb-12">
-          <Image src="/logo.png" alt="KIRA" width={64} height={64} className="rounded-full mx-auto mb-4" />
+          <div className="mx-auto mb-4 flex justify-center"><KiraLogo size="xl" /></div>
           <h1 className="text-2xl font-bold tracking-[0.2em] text-foreground mb-2">KIRA</h1>
           <div className="h-px w-12 mx-auto bg-[#00D4FF] mb-4" />
           <p className="text-xs text-muted-foreground tracking-wider uppercase">

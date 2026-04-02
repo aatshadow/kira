@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Clock, X } from 'lucide-react'
-import Image from 'next/image'
 import { useUIStore } from '@/stores/uiStore'
+import { KiraLogo } from '@/components/shared/KiraLogo'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
@@ -29,7 +29,7 @@ export function CreateTaskFAB() {
   // Close on route change
   useEffect(() => { setMenuOpen(false) }, [pathname])
 
-  if (pathname.startsWith('/settings') || pathname.startsWith('/kira')) return null
+  if (pathname === '/' || pathname.startsWith('/settings') || pathname.startsWith('/kira')) return null
 
   return (
     <div ref={menuRef} className="fixed right-5 md:bottom-6 md:left-6 md:right-auto z-[150]" style={{ bottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
@@ -66,7 +66,7 @@ export function CreateTaskFAB() {
         {menuOpen ? (
           <X className="h-5 w-5 text-foreground" />
         ) : (
-          <Image src="/logo.png" alt="KIRA" width={48} height={48} className="h-full w-full object-cover" />
+          <KiraLogo size="md" />
         )}
       </button>
     </div>
