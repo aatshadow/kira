@@ -45,11 +45,13 @@ export default function ManagementMeetingsPage() {
       <DayStrip />
       <motion.div variants={fadeUp} className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-foreground">Meetings</h2>
-        <motion.div whileTap={{ scale: 0.97 }}>
-          <Button onClick={() => openModal('meeting-create')} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] hover:shadow-[0_0_8px_rgba(0,212,255,0.4)]">
-            <Plus className="h-4 w-4 mr-1" /> Nuevo meeting
-          </Button>
-        </motion.div>
+        <motion.button
+          onClick={() => openModal('meeting-create')}
+          whileTap={{ scale: 0.95 }}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#00D4FF] text-black text-xs font-semibold cursor-pointer hover:shadow-[0_0_16px_rgba(0,212,255,0.4)] transition-shadow"
+        >
+          <Plus className="h-3.5 w-3.5" /> Nuevo meeting
+        </motion.button>
       </motion.div>
 
       {meetings.length === 0 ? (
@@ -59,20 +61,20 @@ export default function ManagementMeetingsPage() {
       ) : (
         <motion.div variants={fadeUp}>
           {/* Tab bar with sliding indicator */}
-          <div className="flex items-center gap-1 p-1 bg-secondary rounded-lg mb-4 w-fit">
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm mb-4 w-fit">
             {tabItems.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'relative px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer z-10',
+                  'relative px-3.5 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer z-10',
                   tab === t.id ? 'text-[#00D4FF]' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 {tab === t.id && (
                   <motion.div
                     layoutId="meeting-tab"
-                    className="absolute inset-0 bg-background rounded-md shadow-sm"
+                    className="absolute inset-0 bg-white/[0.08] border border-white/[0.1] rounded-xl"
                     transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
                   />
                 )}

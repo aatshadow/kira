@@ -117,15 +117,17 @@ export default function ManagementTasksPage() {
   return (
     <PageWrapper>
       <DayStrip />
-      <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-3 mb-6">
-        <motion.div whileTap={{ scale: 0.97 }}>
-          <Button onClick={() => openModal('task-create')} className="bg-[#00D4FF] text-black hover:bg-[#00A8CC] hover:shadow-[0_0_8px_rgba(0,212,255,0.4)]">
-            <Plus className="h-4 w-4 mr-1" /> Nueva task
-          </Button>
-        </motion.div>
+      <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2.5 mb-6">
+        <motion.button
+          onClick={() => openModal('task-create')}
+          whileTap={{ scale: 0.95 }}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#00D4FF] text-black text-xs font-semibold cursor-pointer hover:shadow-[0_0_16px_rgba(0,212,255,0.4)] transition-shadow"
+        >
+          <Plus className="h-3.5 w-3.5" /> Nueva task
+        </motion.button>
 
-        {/* View toggle with sliding indicator */}
-        <div className="flex items-center bg-secondary rounded-md overflow-hidden p-0.5">
+        {/* View toggle — glass pill */}
+        <div className="flex items-center gap-0.5 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm">
           {(Object.keys(viewIcons) as Array<keyof typeof viewIcons>).map((v) => {
             const Icon = viewIcons[v]
             return (
@@ -133,7 +135,7 @@ export default function ManagementTasksPage() {
                 key={v}
                 onClick={() => setView(v)}
                 className={cn(
-                  'relative p-2 transition-colors cursor-pointer rounded-sm',
+                  'relative p-2 transition-colors cursor-pointer rounded-xl',
                   view === v ? 'text-[#00D4FF]' : 'text-muted-foreground hover:text-foreground'
                 )}
                 title={viewLabels[v]}
@@ -141,7 +143,7 @@ export default function ManagementTasksPage() {
                 {view === v && (
                   <motion.div
                     layoutId="task-view"
-                    className="absolute inset-0 bg-[rgba(0,212,255,0.08)] rounded-sm"
+                    className="absolute inset-0 bg-white/[0.08] border border-white/[0.1] rounded-xl"
                     transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
                   />
                 )}
@@ -152,8 +154,8 @@ export default function ManagementTasksPage() {
         </div>
 
         <Select value={filters.dateRange || 'all'} onValueChange={(v) => setFilter('dateRange', v === 'all' ? '' : v as DateRange)}>
-          <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Fecha" /></SelectTrigger>
-          <SelectContent>
+          <SelectTrigger className="w-[150px] h-9 text-xs rounded-2xl bg-white/[0.04] border-white/[0.08] backdrop-blur-sm"><SelectValue placeholder="Fecha" /></SelectTrigger>
+          <SelectContent className="rounded-2xl border-white/[0.08] bg-[#1a1a1a]/95 backdrop-blur-xl">
             <SelectItem value="all">Todas las fechas</SelectItem>
             <SelectItem value="today">Hoy</SelectItem>
             <SelectItem value="tomorrow">Mañana</SelectItem>
@@ -167,8 +169,8 @@ export default function ManagementTasksPage() {
         </Select>
 
         <Select value={filters.priority.length > 0 ? filters.priority[0] : 'all'} onValueChange={(v) => setFilter('priority', !v || v === 'all' ? [] as string[] : [v])}>
-          <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue placeholder="Prioridad" /></SelectTrigger>
-          <SelectContent>
+          <SelectTrigger className="w-[140px] h-9 text-xs rounded-2xl bg-white/[0.04] border-white/[0.08] backdrop-blur-sm"><SelectValue placeholder="Prioridad" /></SelectTrigger>
+          <SelectContent className="rounded-2xl border-white/[0.08] bg-[#1a1a1a]/95 backdrop-blur-xl">
             <SelectItem value="all">Todas</SelectItem>
             <SelectItem value="q1">Q1 — Urgente+Imp</SelectItem>
             <SelectItem value="q2">Q2 — Importante</SelectItem>
@@ -177,8 +179,8 @@ export default function ManagementTasksPage() {
           </SelectContent>
         </Select>
         <Select value={filters.status.length > 0 ? filters.status[0] : 'all'} onValueChange={(v) => setFilter('status', !v || v === 'all' ? [] as string[] : [v])}>
-          <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
+          <SelectTrigger className="w-[140px] h-9 text-xs rounded-2xl bg-white/[0.04] border-white/[0.08] backdrop-blur-sm"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectContent className="rounded-2xl border-white/[0.08] bg-[#1a1a1a]/95 backdrop-blur-xl">
             <SelectItem value="all">Activas</SelectItem>
             <SelectItem value="overdue">Pasadas ({overdueCount})</SelectItem>
             <SelectItem value="backlog">Backlog</SelectItem>
@@ -191,8 +193,8 @@ export default function ManagementTasksPage() {
 
         {projects.length > 0 && (
           <Select value={filters.project || 'all'} onValueChange={(v) => setFilter('project', !v || v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Proyecto" /></SelectTrigger>
-            <SelectContent>
+            <SelectTrigger className="w-[150px] h-9 text-xs rounded-2xl bg-white/[0.04] border-white/[0.08] backdrop-blur-sm"><SelectValue placeholder="Proyecto" /></SelectTrigger>
+            <SelectContent className="rounded-2xl border-white/[0.08] bg-[#1a1a1a]/95 backdrop-blur-xl">
               <SelectItem value="all">Todos los proyectos</SelectItem>
               {projects.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
@@ -203,7 +205,7 @@ export default function ManagementTasksPage() {
 
         <div className="relative ml-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input placeholder="Buscar..." value={filters.search} onChange={(e) => setFilter('search', e.target.value)} className="pl-9 h-9 w-[200px] text-xs bg-secondary" />
+          <Input placeholder="Buscar..." value={filters.search} onChange={(e) => setFilter('search', e.target.value)} className="pl-9 h-9 w-[200px] text-xs rounded-2xl bg-white/[0.04] border-white/[0.08] backdrop-blur-sm" />
         </div>
       </motion.div>
 

@@ -2,9 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Loader2, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2, X } from 'lucide-react'
+import { Send, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2, X } from 'lucide-react'
 import { KiraLogo } from '@/components/shared/KiraLogo'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTasks } from '@/lib/hooks/useTasks'
 import { useTaskStore } from '@/stores/taskStore'
@@ -221,8 +220,8 @@ export function KiraChat() {
             key={conv.id}
             onClick={() => loadConversation(conv.id)}
             className={cn(
-              'group flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-secondary/50 transition-colors border-b border-border/30',
-              conversationId === conv.id && 'bg-secondary/70'
+              'group flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-white/5 transition-colors border-b border-white/[0.04]',
+              conversationId === conv.id && 'bg-white/[0.06]'
             )}
           >
             <div className="flex-1 min-w-0">
@@ -245,17 +244,17 @@ export function KiraChat() {
     <div className="flex gap-0 md:gap-4 h-full">
       {/* Desktop sidebar */}
       <div className={cn(
-        'hidden md:flex shrink-0 flex-col border border-border rounded-lg bg-card/50 overflow-hidden transition-all',
+        'hidden md:flex shrink-0 flex-col glass-card overflow-hidden transition-all',
         showSidebar ? 'w-64' : 'w-12'
       )}>
-        <div className="p-2 border-b border-border flex items-center gap-2">
-          <button onClick={() => setShowSidebar(!showSidebar)} className="p-1.5 rounded-md hover:bg-secondary transition-colors cursor-pointer" title="Conversaciones">
+        <div className="p-2 border-b border-white/[0.06] flex items-center gap-2">
+          <button onClick={() => setShowSidebar(!showSidebar)} className="p-1.5 rounded-xl hover:bg-white/[0.06] transition-colors cursor-pointer" title="Conversaciones">
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </button>
           {showSidebar && (
             <>
               <span className="text-xs font-medium text-muted-foreground flex-1">Historial</span>
-              <button onClick={newConversation} className="p-1.5 rounded-md hover:bg-secondary transition-colors cursor-pointer" title="Nueva conversación">
+              <button onClick={newConversation} className="p-1.5 rounded-xl hover:bg-white/[0.06] transition-colors cursor-pointer" title="Nueva conversación">
                 <Plus className="h-4 w-4 text-[#00D4FF]" />
               </button>
             </>
@@ -264,7 +263,7 @@ export function KiraChat() {
         {showSidebar && <ConversationList />}
         {!showSidebar && (
           <div className="flex-1 flex flex-col items-center pt-2 gap-2">
-            <button onClick={newConversation} className="p-1.5 rounded-md hover:bg-secondary transition-colors cursor-pointer" title="Nueva conversación">
+            <button onClick={newConversation} className="p-1.5 rounded-xl hover:bg-white/[0.06] transition-colors cursor-pointer" title="Nueva conversación">
               <Plus className="h-4 w-4 text-[#00D4FF]" />
             </button>
           </div>
@@ -272,44 +271,74 @@ export function KiraChat() {
       </div>
 
       {/* Mobile history overlay */}
-      {showMobileHistory && (
-        <>
-          <div className="md:hidden fixed inset-0 z-[180] bg-black/60 backdrop-blur-sm" onClick={() => setShowMobileHistory(false)} />
-          <div className="md:hidden fixed bottom-0 left-0 right-0 z-[181] max-h-[70vh] rounded-t-2xl border-t border-border bg-card shadow-[0_-8px_32px_rgba(0,0,0,0.6)] flex flex-col animate-kira-float-in">
-            <div className="flex justify-center pt-2"><div className="w-8 h-1 rounded-full bg-border" /></div>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <span className="text-sm font-medium">Conversaciones</span>
-              <div className="flex items-center gap-2">
-                <button onClick={newConversation} className="p-1.5 rounded-md hover:bg-secondary cursor-pointer"><Plus className="h-4 w-4 text-[#00D4FF]" /></button>
-                <button onClick={() => setShowMobileHistory(false)} className="p-1.5 rounded-md hover:bg-secondary cursor-pointer"><X className="h-4 w-4 text-muted-foreground" /></button>
+      <AnimatePresence>
+        {showMobileHistory && (
+          <>
+            <motion.div
+              className="md:hidden fixed inset-0 z-[180] bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowMobileHistory(false)}
+            />
+            <motion.div
+              className="md:hidden fixed bottom-0 left-0 right-0 z-[181] max-h-[70vh] glass-elevated flex flex-col"
+              style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring' as const, stiffness: 300, damping: 30 }}
+            >
+              <div className="flex justify-center pt-2"><div className="w-8 h-1 rounded-full bg-white/10" /></div>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+                <span className="text-sm font-medium">Conversaciones</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={newConversation} className="p-1.5 rounded-xl hover:bg-white/[0.06] cursor-pointer"><Plus className="h-4 w-4 text-[#00D4FF]" /></button>
+                  <button onClick={() => setShowMobileHistory(false)} className="p-1.5 rounded-xl hover:bg-white/[0.06] cursor-pointer"><X className="h-4 w-4 text-muted-foreground" /></button>
+                </div>
               </div>
-            </div>
-            <ConversationList />
-          </div>
-        </>
-      )}
+              <ConversationList />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile action bar */}
-        <div className="flex md:hidden items-center gap-2 mb-2">
-          <button onClick={() => setShowMobileHistory(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-xs text-muted-foreground cursor-pointer">
+        <div className="flex md:hidden items-center gap-2 mb-3">
+          <motion.button
+            onClick={() => setShowMobileHistory(true)}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-xs text-muted-foreground cursor-pointer backdrop-blur-sm"
+          >
             <MessageSquare className="h-3.5 w-3.5" />
             Historial
-          </button>
-          <button onClick={newConversation} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-xs text-[#00D4FF] cursor-pointer">
+          </motion.button>
+          <motion.button
+            onClick={newConversation}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[rgba(0,212,255,0.06)] border border-[rgba(0,212,255,0.15)] text-xs text-[#00D4FF] cursor-pointer backdrop-blur-sm"
+          >
             <Plus className="h-3.5 w-3.5" />
             Nueva
-          </button>
+          </motion.button>
         </div>
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto rounded-lg md:border md:border-border bg-card/30 md:bg-card/50 p-3 md:p-4 space-y-3 md:space-y-4 min-h-0">
+        <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-4 min-h-0 md:glass-card">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <div className="mb-3 md:mb-4 opacity-80"><KiraLogo size="lg" /></div>
-              <h2 className="text-sm font-medium text-foreground mb-1">Hola, soy KIRA</h2>
-              <p className="text-xs text-muted-foreground mb-4 md:mb-6 max-w-sm">
+              <motion.div
+                className="mb-4"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring' as const, stiffness: 200, damping: 20 }}
+              >
+                <KiraLogo size="lg" />
+              </motion.div>
+              <h2 className="text-sm font-semibold text-foreground mb-1">Hola, soy KIRA</h2>
+              <p className="text-xs text-muted-foreground mb-5 max-w-sm">
                 Puedo crear tasks, meetings, proyectos, categorías, gestionar tu Google Calendar y recordar cosas sobre ti.
               </p>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
@@ -321,7 +350,7 @@ export function KiraChat() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: 0.3 + i * 0.06 }}
                     whileTap={{ scale: 0.95 }}
-                    className="text-[11px] px-3 py-1.5 rounded-full border border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-[#00D4FF]/30 transition-colors cursor-pointer"
+                    className="text-[11px] px-3.5 py-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:text-foreground hover:border-[#00D4FF]/30 hover:bg-white/[0.06] transition-all cursor-pointer backdrop-blur-sm"
                   >
                     {s}
                   </motion.button>
@@ -340,23 +369,30 @@ export function KiraChat() {
                 >
                   <div
                     className={cn(
-                      'max-w-[85%] md:max-w-[75%] rounded-2xl px-3.5 md:px-4 py-2.5 text-sm',
+                      'max-w-[85%] md:max-w-[70%] text-[13px] leading-relaxed',
                       msg.role === 'user'
-                        ? 'bg-[#00D4FF] text-black rounded-br-md'
-                        : 'bg-secondary text-foreground rounded-bl-md'
+                        ? 'rounded-[20px] rounded-br-lg bg-[#00D4FF] text-black px-4 py-3'
+                        : 'rounded-[20px] rounded-bl-lg px-4 py-3 bg-white/[0.05] border border-white/[0.08] backdrop-blur-sm text-foreground'
                     )}
                   >
                     <div className="whitespace-pre-wrap break-words">{msg.content}</div>
                     {msg.actions && msg.actions.length > 0 && (
-                      <div className="mt-2 space-y-1 pt-2 border-t border-black/10">
+                      <div className={cn(
+                        'mt-2.5 space-y-1.5 pt-2.5',
+                        msg.role === 'user' ? 'border-t border-black/10' : 'border-t border-white/[0.08]'
+                      )}>
                         {msg.actions.map((act, j) => (
                           <div key={j} className="flex items-center gap-1.5 text-[11px]">
                             {act.success ? (
-                              <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                              <CheckCircle2 className={cn('h-3 w-3 shrink-0', msg.role === 'user' ? 'text-emerald-700' : 'text-emerald-400')} />
                             ) : (
-                              <AlertCircle className="h-3 w-3 text-red-500 shrink-0" />
+                              <AlertCircle className="h-3 w-3 text-red-400 shrink-0" />
                             )}
-                            <span className={act.success ? 'opacity-80' : 'text-red-600'}>
+                            <span className={cn(
+                              act.success
+                                ? (msg.role === 'user' ? 'opacity-80' : 'text-muted-foreground')
+                                : 'text-red-400'
+                            )}>
                               {actionLabel(act.action)}
                               {!act.success && act.error ? `: ${act.error}` : ''}
                             </span>
@@ -373,11 +409,11 @@ export function KiraChat() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-3">
-                    <div className="flex items-center gap-2">
+                  <div className="rounded-[20px] rounded-bl-lg px-4 py-3 bg-white/[0.05] border border-white/[0.08] backdrop-blur-sm">
+                    <div className="flex items-center gap-2.5">
                       <motion.div
                         className="h-2 w-2 rounded-full bg-[#00D4FF]"
-                        animate={{ opacity: [1, 0.3, 1] }}
+                        animate={{ scale: [1, 1.3, 1], opacity: [1, 0.3, 1] }}
                         transition={{ duration: 1.5, repeat: Infinity }}
                       />
                       <span className="text-xs text-muted-foreground">KIRA está pensando...</span>
@@ -391,8 +427,8 @@ export function KiraChat() {
         </div>
 
         {/* Input area */}
-        <div className="mt-2 md:mt-3 flex gap-2 pb-[env(safe-area-inset-bottom)]">
-          <div className="flex-1 relative">
+        <div className="mt-3 pb-[env(safe-area-inset-bottom)]">
+          <div className="relative glass-card !rounded-2xl overflow-hidden !p-0">
             <textarea
               ref={inputRef}
               value={input}
@@ -400,7 +436,7 @@ export function KiraChat() {
               onKeyDown={handleKeyDown}
               placeholder="Escríbele a KIRA..."
               rows={1}
-              className="w-full resize-none rounded-xl border border-border bg-secondary px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00D4FF]/50 focus:border-[rgba(0,212,255,0.3)] focus:shadow-[0_0_12px_rgba(0,212,255,0.15)] transition-shadow"
+              className="w-full resize-none bg-transparent px-4 py-3.5 pr-12 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
               style={{ minHeight: '48px', maxHeight: '120px' }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement
@@ -408,14 +444,14 @@ export function KiraChat() {
                 target.style.height = Math.min(target.scrollHeight, 120) + 'px'
               }}
             />
-            <Button
+            <motion.button
               onClick={() => sendMessage()}
               disabled={!input.trim() || loading}
-              size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg bg-[#00D4FF] text-black hover:bg-[#00A8CC] disabled:opacity-30"
+              whileTap={{ scale: 0.9 }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-xl bg-[#00D4FF] text-black flex items-center justify-center disabled:opacity-20 cursor-pointer transition-opacity"
             >
               <Send className="h-3.5 w-3.5" />
-            </Button>
+            </motion.button>
           </div>
         </div>
       </div>

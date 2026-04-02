@@ -47,7 +47,7 @@ export default function SettingsPage() {
 
       <motion.div variants={fadeUp} className="flex gap-8">
         {/* Sidebar nav */}
-        <nav className="w-[200px] shrink-0 space-y-1">
+        <nav className="w-[200px] shrink-0 space-y-1 p-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
           {sections.map((s) => {
             const Icon = s.icon
             return (
@@ -55,16 +55,16 @@ export default function SettingsPage() {
                 key={s.id}
                 onClick={() => setActiveSection(s.id)}
                 className={cn(
-                  'relative flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md transition-colors cursor-pointer text-left',
+                  'relative flex items-center gap-2 w-full px-3 py-2 text-sm rounded-xl transition-colors cursor-pointer text-left',
                   activeSection === s.id
                     ? 'text-[#00D4FF]'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.04]'
                 )}
               >
                 {activeSection === s.id && (
                   <motion.div
                     layoutId="settings-nav"
-                    className="absolute inset-0 bg-[rgba(0,212,255,0.08)] rounded-md"
+                    className="absolute inset-0 bg-white/[0.08] border border-white/[0.1] rounded-xl"
                     transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
                   />
                 )}

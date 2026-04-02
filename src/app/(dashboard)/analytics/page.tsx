@@ -845,13 +845,13 @@ export default function AnalyticsPage() {
         <h1 className="text-xl font-bold text-foreground">Analytics</h1>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center bg-secondary rounded-md overflow-hidden p-0.5">
+          <div className="flex items-center gap-0.5 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm">
             {ranges.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setRange(r.id)}
                 className={cn(
-                  'relative px-3 py-1.5 text-xs transition-colors cursor-pointer rounded-sm z-10',
+                  'relative px-3 py-1.5 text-xs transition-colors cursor-pointer rounded-xl z-10',
                   range === r.id
                     ? 'text-[#00D4FF]'
                     : 'text-muted-foreground hover:text-foreground'
@@ -860,7 +860,7 @@ export default function AnalyticsPage() {
                 {range === r.id && (
                   <motion.div
                     layoutId="analytics-range"
-                    className="absolute inset-0 bg-[rgba(0,212,255,0.08)] rounded-sm"
+                    className="absolute inset-0 bg-white/[0.08] border border-white/[0.1] rounded-xl"
                     transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
                   />
                 )}
@@ -873,7 +873,7 @@ export default function AnalyticsPage() {
 
       {/* Tab bar */}
       <motion.div
-        className="bg-secondary rounded-lg p-1 flex gap-1 mb-6"
+        className="rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm p-1 flex gap-1 mb-6"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
@@ -883,7 +883,7 @@ export default function AnalyticsPage() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'relative flex-1 px-4 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer z-10',
+              'relative flex-1 px-4 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer z-10',
               activeTab === tab.id
                 ? 'text-[#00D4FF]'
                 : 'text-muted-foreground hover:text-foreground'
@@ -892,7 +892,7 @@ export default function AnalyticsPage() {
             {activeTab === tab.id && (
               <motion.div
                 layoutId="analytics-tab"
-                className="absolute inset-0 bg-card rounded-md shadow-sm border border-border"
+                className="absolute inset-0 bg-white/[0.08] border border-white/[0.1] rounded-xl"
                 transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
               />
             )}

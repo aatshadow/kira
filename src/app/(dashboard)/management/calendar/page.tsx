@@ -154,9 +154,9 @@ export default function CalendarPage() {
             </motion.h2>
           </AnimatePresence>
           <div className="flex items-center gap-1">
-            <motion.button whileTap={{ scale: 0.9 }} onClick={goToday} className="text-[11px] px-2 py-1 rounded border border-border hover:bg-secondary cursor-pointer">Hoy</motion.button>
-            <motion.button whileTap={{ scale: 0.85 }} onClick={prevPeriod} className="p-1 hover:bg-secondary rounded cursor-pointer"><ChevronLeft className="h-4 w-4" /></motion.button>
-            <motion.button whileTap={{ scale: 0.85 }} onClick={nextPeriod} className="p-1 hover:bg-secondary rounded cursor-pointer"><ChevronRight className="h-4 w-4" /></motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={goToday} className="text-[11px] px-2.5 py-1 rounded-xl border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer backdrop-blur-sm">Hoy</motion.button>
+            <motion.button whileTap={{ scale: 0.85 }} onClick={prevPeriod} className="p-1 hover:bg-white/[0.06] rounded-xl cursor-pointer"><ChevronLeft className="h-4 w-4" /></motion.button>
+            <motion.button whileTap={{ scale: 0.85 }} onClick={nextPeriod} className="p-1 hover:bg-white/[0.06] rounded-xl cursor-pointer"><ChevronRight className="h-4 w-4" /></motion.button>
           </div>
         </div>
 
@@ -166,20 +166,20 @@ export default function CalendarPage() {
             <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[#8B5CF6]" /> Meetings</span>
             <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[#4285F4]" /> Google Cal</span>
           </div>
-          <div className="flex items-center gap-0.5 p-0.5 bg-secondary rounded-lg">
+          <div className="flex items-center gap-0.5 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm">
             {(['month', 'week', 'day'] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => { setView(v); if (v === 'day') setSelectedDay(currentMonth) }}
                 className={cn(
-                  'relative px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer capitalize z-10',
+                  'relative px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-colors cursor-pointer capitalize z-10',
                   view === v ? 'text-[#00D4FF]' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 {view === v && (
                   <motion.div
                     layoutId="cal-view"
-                    className="absolute inset-0 bg-background rounded-md shadow-sm"
+                    className="absolute inset-0 bg-white/[0.08] border border-white/[0.1] rounded-xl"
                     transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
                   />
                 )}

@@ -77,10 +77,10 @@ export function TopBar() {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               whileTap={{ scale: 0.95 }}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all cursor-pointer',
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all cursor-pointer backdrop-blur-sm',
                 mobileMenuOpen
-                  ? 'bg-[rgba(0,212,255,0.1)] text-[#00D4FF]'
-                  : 'bg-secondary text-muted-foreground'
+                  ? 'bg-[rgba(0,212,255,0.08)] border border-[rgba(0,212,255,0.2)] text-[#00D4FF]'
+                  : 'bg-white/[0.04] border border-white/[0.08] text-muted-foreground'
               )}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
@@ -95,7 +95,7 @@ export function TopBar() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: -4 }}
                   transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute top-full right-0 mt-2 w-56 rounded-xl border border-border/50 bg-card/95 backdrop-blur-xl shadow-[0_16px_48px_rgba(0,0,0,0.6)] overflow-hidden origin-top-right"
+                  className="absolute top-full right-0 mt-2 w-56 rounded-2xl border border-white/[0.1] bg-[#141414]/95 backdrop-blur-2xl shadow-[0_16px_48px_rgba(0,0,0,0.6)] overflow-hidden origin-top-right"
                 >
                   <div className="p-1.5">
                     {navLinks.map((link) => {
@@ -111,14 +111,14 @@ export function TopBar() {
                               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
                               isActive
                                 ? 'text-[#00D4FF] bg-[rgba(0,212,255,0.08)]'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/70'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.06]'
                             )}
                           >
                             <Icon className="h-4 w-4" />
                             {link.label}
                           </Link>
                           {isManagement && (showSubs || isActive) && (
-                            <div className="ml-4 pl-3 border-l border-border/40 my-0.5">
+                            <div className="ml-4 pl-3 border-l border-white/[0.06] my-0.5">
                               {managementSubs.map((sub) => {
                                 const SubIcon = sub.icon
                                 const subActive = pathname === sub.href
@@ -130,7 +130,7 @@ export function TopBar() {
                                       'flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors',
                                       subActive
                                         ? 'text-[#00D4FF] bg-[rgba(0,212,255,0.06)]'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
                                     )}
                                   >
                                     <SubIcon className="h-3.5 w-3.5" />

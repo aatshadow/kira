@@ -26,7 +26,7 @@ interface StatProps {
 
 function Stat({ icon: Icon, label, value, accent }: StatProps) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/50 border border-border/50 min-w-0">
+    <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm min-w-0">
       <Icon className={`h-3.5 w-3.5 shrink-0 ${accent ? 'text-[#00D4FF]' : 'text-muted-foreground'}`} />
       <div className="min-w-0">
         <p className="text-[9px] uppercase tracking-wider text-muted-foreground leading-none mb-0.5">{label}</p>

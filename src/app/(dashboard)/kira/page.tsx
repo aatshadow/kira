@@ -23,7 +23,7 @@ export default function KiraPage() {
 
   return (
     <motion.div
-      className="py-2 md:py-8 flex flex-col"
+      className="px-4 md:px-8 py-2 md:py-6 flex flex-col max-w-[900px] mx-auto"
       style={{ height: 'calc(100vh - 4.5rem)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -32,7 +32,7 @@ export default function KiraPage() {
       {/* Header with tabs */}
       <div className="flex items-center justify-between mb-3 md:mb-4">
         <motion.div
-          className="hidden md:flex items-center gap-2"
+          className="hidden md:flex items-center gap-3"
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
@@ -44,8 +44,8 @@ export default function KiraPage() {
           </div>
         </motion.div>
 
-        {/* Tab bar with sliding indicator */}
-        <div className="flex items-center gap-1 p-1 bg-secondary rounded-lg w-full md:w-auto relative">
+        {/* Tab bar — glass pill */}
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm w-full md:w-auto relative">
           {tabs.map((tab) => {
             const Icon = tab.icon
             return (
@@ -53,7 +53,7 @@ export default function KiraPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'relative flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer z-10',
+                  'relative flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 md:py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer z-10',
                   activeTab === tab.id
                     ? 'text-[#00D4FF]'
                     : 'text-muted-foreground hover:text-foreground'
@@ -62,7 +62,7 @@ export default function KiraPage() {
                 {activeTab === tab.id && (
                   <motion.div
                     layoutId="kira-tab"
-                    className="absolute inset-0 bg-background rounded-md shadow-sm"
+                    className="absolute inset-0 bg-white/[0.08] border border-white/[0.1] rounded-xl"
                     transition={{ type: 'spring' as const, stiffness: 380, damping: 30 }}
                   />
                 )}
