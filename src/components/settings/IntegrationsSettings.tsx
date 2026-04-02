@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Calendar, HardDrive, MessageCircle, Mail, FileText, RefreshCw, Check, X, Loader2 } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Calendar, HardDrive, MessageCircle, Mail, FileText, RefreshCw, Check, X, Loader2, Plug } from 'lucide-react'
+import { fadeUp, staggerContainer } from '@/lib/animations'
 
 interface IntegrationStatus {
   google_calendar: { connected: boolean; last_sync: string | null }
@@ -75,15 +75,6 @@ export function IntegrationsSettings() {
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   }
 
-  const ConnectedBadge = ({ connected }: { connected: boolean }) => (
-    <Badge variant={connected ? 'default' : 'secondary'} className={connected
-      ? 'text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-      : 'text-[10px]'
-    }>
-      {connected ? <><Check className="h-2.5 w-2.5 mr-1" /> Conectado</> : <><X className="h-2.5 w-2.5 mr-1" /> No conectado</>}
-    </Badge>
-  )
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -95,127 +86,135 @@ export function IntegrationsSettings() {
     )
   }
 
+  const integrations = [
+    {
+      id: 'google_calendar',
+      name: 'Google Calendar',
+      desc: 'Sincroniza meetings automaticamente. Los eventos pasados cuentan como completados.',
+      icon: Calendar,
+      color: '#4285F4',
+      connected: status?.google_calendar.connected || false,
+      hasActions: true,
+    },
+    {
+      id: 'google_drive',
+      name: 'Google Drive',
+      desc: 'Acceso a transcripciones de Google Meet guardadas en Drive.',
+      icon: HardDrive,
+      color: '#4285F4',
+      connected: status?.google_drive.connected || false,
+    },
+    {
+      id: 'whatsapp',
+      name: 'WhatsApp',
+      desc: 'Mensajes, seguimiento de conversaciones y notificaciones.',
+      icon: MessageCircle,
+      color: '#25D366',
+      connected: status?.whatsapp.connected || false,
+    },
+    {
+      id: 'notion',
+      name: 'Notion',
+      desc: 'Sincroniza bases de datos, notas y documentos.',
+      icon: FileText,
+      color: '#000',
+      connected: status?.notion.connected || false,
+    },
+    {
+      id: 'gmail',
+      name: 'Gmail',
+      desc: 'Lee y gestiona emails, extrae tareas de conversaciones.',
+      icon: Mail,
+      color: '#EA4335',
+      connected: status?.gmail.connected || false,
+    },
+  ]
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-lg font-semibold">Integraciones</h2>
+    <motion.div
+      className="space-y-6"
+      variants={staggerContainer}
+      initial="hidden"
+      animate="show"
+    >
+      <motion.div variants={fadeUp} className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
+          <Plug className="h-5 w-5 text-[#00D4FF]" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold">Integraciones</h2>
+          <p className="text-[11px] text-muted-foreground">Conecta tus herramientas para que KIRA las controle</p>
+        </div>
+      </motion.div>
+
       <div className="space-y-3">
-
-        {/* Google Calendar — ACTIVE */}
-        <div className="p-4 rounded-lg border border-border bg-card">
-          <div className="flex items-start gap-4">
-            <div className="h-10 w-10 rounded-lg bg-[rgba(66,133,244,0.1)] flex items-center justify-center shrink-0">
-              <Calendar className="h-5 w-5 text-[#4285F4]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-sm font-medium text-foreground">Google Calendar</h3>
-                <ConnectedBadge connected={status?.google_calendar.connected || false} />
-              </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                Sincroniza meetings automaticamente. Los eventos pasados cuentan como completados.
-              </p>
-
-              {status?.google_calendar.connected && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <RefreshCw className="h-3 w-3" />
-                    Ultimo sync: {formatLastSync(status.google_calendar.last_sync)}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleSync}
-                      disabled={syncing}
-                      className="h-7 text-xs"
-                    >
-                      {syncing ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Sincronizando...</> : <><RefreshCw className="h-3 w-3 mr-1" /> Sincronizar ahora</>}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleTranscripts}
-                      disabled={fetchingTranscripts}
-                      className="h-7 text-xs"
-                    >
-                      {fetchingTranscripts ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Buscando...</> : <><FileText className="h-3 w-3 mr-1" /> Buscar transcripciones</>}
-                    </Button>
-                  </div>
-                  {syncResult && <p className="text-[11px] text-[#00D4FF]">{syncResult}</p>}
-                  {transcriptResult && <p className="text-[11px] text-[#00D4FF]">{transcriptResult}</p>}
+        {integrations.map((int) => {
+          const Icon = int.icon
+          return (
+            <motion.div
+              key={int.id}
+              variants={fadeUp}
+              className="glass-card !rounded-2xl p-4"
+            >
+              <div className="flex items-start gap-4">
+                <div
+                  className="h-11 w-11 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: `${int.color}15` }}
+                >
+                  <Icon className="h-5 w-5" style={{ color: int.color }} />
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <h3 className="text-sm font-semibold text-foreground">{int.name}</h3>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      int.connected
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : 'bg-white/[0.04] text-muted-foreground border border-white/[0.08]'
+                    }`}>
+                      {int.connected ? (
+                        <span className="flex items-center gap-1"><Check className="h-2.5 w-2.5" /> Conectado</span>
+                      ) : (
+                        <span className="flex items-center gap-1"><X className="h-2.5 w-2.5" /> Conectar</span>
+                      )}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{int.desc}</p>
 
-        {/* Google Drive — ACTIVE (same auth) */}
-        <div className="p-4 rounded-lg border border-border bg-card">
-          <div className="flex items-start gap-4">
-            <div className="h-10 w-10 rounded-lg bg-[rgba(66,133,244,0.1)] flex items-center justify-center shrink-0">
-              <HardDrive className="h-5 w-5 text-[#4285F4]" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-sm font-medium text-foreground">Google Drive</h3>
-                <ConnectedBadge connected={status?.google_drive.connected || false} />
+                  {/* Google Calendar actions */}
+                  {int.id === 'google_calendar' && int.connected && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <RefreshCw className="h-3 w-3" />
+                        Ultimo sync: {formatLastSync(status?.google_calendar.last_sync || null)}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={handleSync}
+                          disabled={syncing}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-foreground hover:bg-white/[0.08] disabled:opacity-50 cursor-pointer transition-all"
+                        >
+                          {syncing ? <><Loader2 className="h-3 w-3 animate-spin" /> Sincronizando...</> : <><RefreshCw className="h-3 w-3" /> Sincronizar</>}
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={handleTranscripts}
+                          disabled={fetchingTranscripts}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-foreground hover:bg-white/[0.08] disabled:opacity-50 cursor-pointer transition-all"
+                        >
+                          {fetchingTranscripts ? <><Loader2 className="h-3 w-3 animate-spin" /> Buscando...</> : <><FileText className="h-3 w-3" /> Transcripciones</>}
+                        </motion.button>
+                      </div>
+                      {syncResult && <p className="text-[11px] text-[#00D4FF]">{syncResult}</p>}
+                      {transcriptResult && <p className="text-[11px] text-[#00D4FF]">{transcriptResult}</p>}
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Acceso a transcripciones de Google Meet guardadas en Drive.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* WhatsApp — COMING SOON */}
-        <div className="p-4 rounded-lg border border-border bg-card opacity-60">
-          <div className="flex items-start gap-4">
-            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-              <MessageCircle className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-sm font-medium text-foreground">WhatsApp</h3>
-                <Badge variant="secondary" className="text-[10px]">Proximamente</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">Mensajes, seguimiento de conversaciones y notificaciones.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Notion — COMING SOON */}
-        <div className="p-4 rounded-lg border border-border bg-card opacity-60">
-          <div className="flex items-start gap-4">
-            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-              <FileText className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-sm font-medium text-foreground">Notion</h3>
-                <Badge variant="secondary" className="text-[10px]">Proximamente</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">Sincroniza bases de datos, notas y documentos.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Gmail — COMING SOON */}
-        <div className="p-4 rounded-lg border border-border bg-card opacity-60">
-          <div className="flex items-start gap-4">
-            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-              <Mail className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-sm font-medium text-foreground">Gmail</h3>
-                <Badge variant="secondary" className="text-[10px]">Proximamente</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">Lee y gestiona emails, extrae tareas de conversaciones.</p>
-            </div>
-          </div>
-        </div>
-
+            </motion.div>
+          )
+        })}
       </div>
-    </div>
+    </motion.div>
   )
 }

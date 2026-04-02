@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquareText, Mic, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -18,8 +19,17 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]['id']
 
-export default function KiraPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('chat')
+function KiraPageInner() {
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState<TabId>(
+    tabParam === 'agents' ? 'agents' : tabParam === 'talk' ? 'talk' : 'chat'
+  )
+
+  useEffect(() => {
+    if (tabParam === 'agents') setActiveTab('agents')
+    else if (tabParam === 'talk') setActiveTab('talk')
+  }, [tabParam])
 
   return (
     <motion.div
@@ -94,5 +104,13 @@ export default function KiraPage() {
         </AnimatePresence>
       </div>
     </motion.div>
+  )
+}
+
+export default function KiraPage() {
+  return (
+    <Suspense>
+      <KiraPageInner />
+    </Suspense>
   )
 }

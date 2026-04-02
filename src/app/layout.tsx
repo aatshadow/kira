@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import { Sora, JetBrains_Mono } from 'next/font/google'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
-const inter = Inter({
-  variable: '--font-inter',
+const sora = Sora({
+  variable: '--font-sora',
   subsets: ['latin'],
   display: 'swap',
 })
@@ -49,7 +49,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="dark">
-      <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
+      <body className={`${sora.variable} ${jetbrainsMono.variable} antialiased`}>
         <TooltipProvider>
           {children}
           <Toaster />

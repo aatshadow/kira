@@ -6,14 +6,15 @@ import { DayStatus } from '@/components/dashboard/DayStatus'
 import { ControlCenterGrid } from '@/components/dashboard/ControlCenterGrid'
 import { KiraOrb } from '@/components/dashboard/KiraOrb'
 import { useTasks } from '@/lib/hooks/useTasks'
-import { useTaskStore } from '@/stores/taskStore'
 import { useMeetingStore } from '@/stores/meetingStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useTimer } from '@/lib/hooks/useTimer'
 import { IS_DEMO } from '@/lib/demo'
-import { format, isToday as isTodayFn, isTomorrow, differenceInMinutes } from 'date-fns'
+import { format, isToday as isTodayFn, differenceInMinutes } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { staggerContainer, fadeUp } from '@/lib/animations'
+import { Video, Clock } from 'lucide-react'
+import Link from 'next/link'
 
 interface CalendarEvent {
   id: string
@@ -27,6 +28,7 @@ interface UnifiedMeeting {
   id: string
   title: string
   dateTime: Date
+  endTime?: Date
   participants: string | null
   source: 'kira' | 'gcal'
   durationMins: number | null
@@ -63,23 +65,38 @@ export default function DashboardPage() {
       .reduce((sum, e) => sum + Math.round((new Date(e.end).getTime() - new Date(e.start).getTime()) / 60000), 0)
   }, [calendarEvents])
 
-  const nextMeetings = useMemo(() => {
+  // All today's meetings (KIRA + Google Cal)
+  const todayMeetings = useMemo(() => {
     const now = new Date()
+    const todayStr = now.toDateString()
     const unified: UnifiedMeeting[] = []
-    meetings.filter((m) => m.status === 'scheduled' && m.scheduled_at && new Date(m.scheduled_at) > now)
-      .forEach((m) => unified.push({ id: m.id, title: m.title, dateTime: new Date(m.scheduled_at!), participants: m.participants, source: 'kira', durationMins: m.duration_mins }))
-    calendarEvents.filter((e) => new Date(e.start) > now)
-      .forEach((e) => unified.push({ id: e.id, title: e.title, dateTime: new Date(e.start), participants: e.attendees || null, source: 'gcal', durationMins: Math.round((new Date(e.end).getTime() - new Date(e.start).getTime()) / 60000) }))
-    return unified.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime()).slice(0, 3)
+
+    meetings
+      .filter((m) => m.scheduled_at && new Date(m.scheduled_at).toDateString() === todayStr && m.status !== 'cancelled')
+      .forEach((m) => unified.push({
+        id: m.id, title: m.title, dateTime: new Date(m.scheduled_at!),
+        participants: m.participants, source: 'kira', durationMins: m.duration_mins,
+      }))
+
+    calendarEvents
+      .filter((e) => new Date(e.start).toDateString() === todayStr)
+      .forEach((e) => {
+        // Skip duplicates already in KIRA meetings
+        if (unified.some((u) => u.title === e.title)) return
+        unified.push({
+          id: e.id, title: e.title, dateTime: new Date(e.start), endTime: new Date(e.end),
+          participants: e.attendees || null, source: 'gcal',
+          durationMins: Math.round((new Date(e.end).getTime() - new Date(e.start).getTime()) / 60000),
+        })
+      })
+
+    return unified.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
   }, [meetings, calendarEvents])
 
   const formatMeetingTime = (dt: Date) => {
     const diffMins = differenceInMinutes(dt, new Date())
-    if (diffMins <= 0) return 'Ahora'
-    if (diffMins < 60) return `En ${diffMins} min`
-    if (isTodayFn(dt)) return `Hoy, ${format(dt, 'HH:mm')}`
-    if (isTomorrow(dt)) return `Mañana, ${format(dt, 'HH:mm')}`
-    return format(dt, "EEE d, HH:mm", { locale: es })
+    if (diffMins <= 0 && diffMins > -60) return 'Ahora'
+    return format(dt, 'HH:mm')
   }
 
   return (
@@ -89,8 +106,58 @@ export default function DashboardPage() {
       initial="hidden"
       animate="show"
     >
+      {/* Today's Meetings Widget */}
+      {todayMeetings.length > 0 && (
+        <motion.div variants={fadeUp} className="pt-2 md:pt-4 mb-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <Video className="h-3.5 w-3.5 text-[#3B82F6]" />
+              <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Meetings hoy</h3>
+            </div>
+            <Link href="/management/meetings" className="text-[10px] text-[#00D4FF]/60 hover:text-[#00D4FF] transition-colors">
+              Ver todos
+            </Link>
+          </div>
+          <div className="space-y-1.5">
+            {todayMeetings.map((meeting) => {
+              const diffMins = differenceInMinutes(meeting.dateTime, new Date())
+              const isNow = diffMins <= 0 && diffMins > -60
+              const isNext = diffMins > 0 && diffMins <= 30
+
+              return (
+                <motion.div
+                  key={`${meeting.source}-${meeting.id}`}
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-all ${
+                    isNow
+                      ? 'bg-[rgba(0,212,255,0.06)] border border-[rgba(0,212,255,0.15)]'
+                      : isNext
+                        ? 'bg-white/[0.03] border border-white/[0.08]'
+                        : 'bg-white/[0.02] border border-transparent'
+                  }`}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="text-[11px] font-mono text-muted-foreground w-[42px] shrink-0 tabular-nums">
+                    {formatMeetingTime(meeting.dateTime)}
+                  </span>
+                  <motion.span
+                    className="h-1.5 w-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: isNow ? '#00D4FF' : meeting.source === 'kira' ? '#8B5CF6' : '#4285F4' }}
+                    animate={isNow ? { scale: [1, 1.5, 1], opacity: [1, 0.4, 1] } : {}}
+                    transition={isNow ? { duration: 2, repeat: Infinity } : {}}
+                  />
+                  <span className="text-[12px] text-foreground truncate flex-1">{meeting.title}</span>
+                  {meeting.durationMins && (
+                    <span className="text-[10px] text-muted-foreground/50 shrink-0">{meeting.durationMins}m</span>
+                  )}
+                </motion.div>
+              )
+            })}
+          </div>
+        </motion.div>
+      )}
+
       {/* Status Island */}
-      <motion.div variants={fadeUp} className="pt-2 md:pt-4">
+      <motion.div variants={fadeUp}>
         <DayStatus dailyGoalHours={8} calendarEventsMins={calendarEventsMinsToday} />
       </motion.div>
 
@@ -136,45 +203,6 @@ export default function DashboardPage() {
       <motion.div variants={fadeUp} className="mt-5">
         <ControlCenterGrid />
       </motion.div>
-
-      {/* Upcoming timeline */}
-      {nextMeetings.length > 0 && (
-        <motion.div variants={fadeUp} className="mt-5">
-          <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Próximos</h3>
-          <div className="space-y-2">
-            {nextMeetings.map((meeting, i) => {
-              const minsUntil = differenceInMinutes(meeting.dateTime, new Date())
-              const isImminent = minsUntil <= 15 && minsUntil > 0
-              return (
-                <motion.div
-                  key={`${meeting.source}-${meeting.id}`}
-                  className="glass-card flex items-center gap-3 px-4 py-3"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.4 + i * 0.06 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <motion.span
-                    className="h-2 w-2 rounded-full shrink-0"
-                    style={{ backgroundColor: meeting.source === 'kira' ? '#8B5CF6' : '#4285F4' }}
-                    animate={isImminent ? { scale: [1, 1.4, 1], opacity: [1, 0.5, 1] } : {}}
-                    transition={isImminent ? { duration: 2, repeat: Infinity } : {}}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-foreground truncate">{meeting.title}</p>
-                    {meeting.participants && (
-                      <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5">{meeting.participants}</p>
-                    )}
-                  </div>
-                  <span className={`text-[11px] font-semibold ${isImminent ? 'text-[#00D4FF]' : 'text-muted-foreground'}`}>
-                    {formatMeetingTime(meeting.dateTime)}
-                  </span>
-                </motion.div>
-              )
-            })}
-          </div>
-        </motion.div>
-      )}
 
       {/* KIRA Orb */}
       <KiraOrb />

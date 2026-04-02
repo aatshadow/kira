@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { Terminal, Code2, Video, MessageCircle, Users, ListTodo, BarChart3, Plus } from 'lucide-react'
+import { Bot, Video, MessageCircle, ListTodo, BarChart3, Plus, ExternalLink, Settings } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useMeetingStore } from '@/stores/meetingStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -15,8 +15,8 @@ interface Module {
   icon: React.ElementType
   color: string
   href?: string
+  externalHref?: string
   action?: () => void
-  enabled: boolean
   badge?: number | string
   colSpan?: number
 }
@@ -36,14 +36,14 @@ export function ControlCenterGrid() {
   }).length
 
   const modules: Module[] = [
-    { id: 'terminal', label: 'Terminal', subtitle: 'Pronto', icon: Terminal, color: '#22C55A', enabled: false },
-    { id: 'claude', label: 'Claude Code', subtitle: 'Pronto', icon: Code2, color: '#8B5CF6', enabled: false },
-    { id: 'meetings', label: 'Meetings', subtitle: todayMeetings > 0 ? `${todayMeetings} hoy` : 'Sin meetings', icon: Video, color: '#3B82F6', href: '/management/meetings', enabled: true, badge: todayMeetings || undefined },
-    { id: 'whatsapp', label: 'WhatsApp', subtitle: 'Mensajes', icon: MessageCircle, color: '#25D366', href: '/kira', enabled: true },
-    { id: 'crm', label: 'CRM', subtitle: 'Pronto', icon: Users, color: '#F97316', enabled: false },
-    { id: 'tasks', label: 'Tasks', subtitle: pendingTasks > 0 ? `${pendingTasks} pendientes` : 'Todo al día', icon: ListTodo, color: '#00D4FF', href: '/management/tasks', enabled: true, badge: pendingTasks || undefined },
-    { id: 'analytics', label: 'Analytics', subtitle: 'Métricas', icon: BarChart3, color: '#888', href: '/analytics', enabled: true },
-    { id: 'create', label: 'Crear...', subtitle: 'Task, meeting, nota', icon: Plus, color: '#00D4FF', action: () => openModal('task-create'), enabled: true, colSpan: 2 },
+    { id: 'kira', label: 'KIRA', subtitle: 'Hablar con KIRA', icon: Bot, color: '#00D4FF', href: '/kira' },
+    { id: 'agents', label: 'Agentes', subtitle: 'Integraciones', icon: Settings, color: '#8B5CF6', href: '/kira?tab=agents' },
+    { id: 'meetings', label: 'Meetings', subtitle: todayMeetings > 0 ? `${todayMeetings} hoy` : 'Sin meetings', icon: Video, color: '#3B82F6', href: '/management/meetings', badge: todayMeetings || undefined },
+    { id: 'whatsapp', label: 'WhatsApp', subtitle: 'Mensajes', icon: MessageCircle, color: '#25D366', href: '/kira' },
+    { id: 'tasks', label: 'Tasks', subtitle: pendingTasks > 0 ? `${pendingTasks} pendientes` : 'Todo al dia', icon: ListTodo, color: '#00D4FF', href: '/management/tasks', badge: pendingTasks || undefined },
+    { id: 'analytics', label: 'Analytics', subtitle: 'Metricas', icon: BarChart3, color: '#888', href: '/analytics' },
+    { id: 'central', label: 'Consola Central', subtitle: 'Black Wolf', icon: ExternalLink, color: '#F97316', externalHref: 'https://central.blackwolfsec.io', colSpan: 2 },
+    { id: 'create', label: 'Crear...', subtitle: 'Task, meeting, nota', icon: Plus, color: '#00D4FF', action: () => openModal('task-create'), colSpan: 2 },
   ]
 
   return (
@@ -55,22 +55,23 @@ export function ControlCenterGrid() {
     >
       {modules.map((mod) => {
         const Icon = mod.icon
+        const isExternal = !!mod.externalHref
         const isCreate = mod.id === 'create'
+        const isCentral = mod.id === 'central'
 
         return (
           <motion.button
             key={mod.id}
             variants={floatUp}
-            whileTap={mod.enabled ? tapBounce : undefined}
+            whileTap={tapBounce}
             onClick={() => {
-              if (!mod.enabled) return
               if (mod.action) mod.action()
+              else if (mod.externalHref) window.open(mod.externalHref, '_blank')
               else if (mod.href) router.push(mod.href)
             }}
             className={`glass-card glow-bleed relative flex flex-col items-start p-4 text-left cursor-pointer transition-all ${
               mod.colSpan === 2 ? 'col-span-2' : ''
-            } ${!mod.enabled ? 'opacity-50' : ''}`}
-            style={{ borderRadius: isCreate ? 24 : 24 }}
+            }`}
           >
             {/* Icon container */}
             <div
@@ -94,18 +95,20 @@ export function ControlCenterGrid() {
               </span>
             )}
 
-            {/* "Pronto" tag for disabled */}
-            {!mod.enabled && (
-              <span className="absolute top-3 right-3 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-full">
-                Pronto
-              </span>
+            {/* External link indicator */}
+            {isExternal && (
+              <ExternalLink className="absolute top-3.5 right-3.5 h-3.5 w-3.5 text-muted-foreground/40" />
             )}
 
-            {/* Create gradient accent */}
-            {isCreate && (
+            {/* Gradient accent for special cards */}
+            {(isCreate || isCentral) && (
               <div
                 className="absolute inset-0 rounded-3xl pointer-events-none"
-                style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.04) 0%, rgba(139,92,246,0.04) 100%)' }}
+                style={{
+                  background: isCentral
+                    ? 'linear-gradient(135deg, rgba(249,115,22,0.04) 0%, rgba(234,88,12,0.02) 100%)'
+                    : 'linear-gradient(135deg, rgba(0,212,255,0.04) 0%, rgba(139,92,246,0.04) 100%)'
+                }}
               />
             )}
           </motion.button>
