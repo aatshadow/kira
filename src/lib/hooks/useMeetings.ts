@@ -39,6 +39,14 @@ async function autoCompletePastMeetings() {
   }
 }
 
+async function syncCalendar() {
+  try {
+    await fetch('/api/calendar/sync', { method: 'POST' })
+  } catch {
+    // Calendar not connected or sync failed — skip silently
+  }
+}
+
 async function fetchMeetingsData() {
   const store = useMeetingStore.getState()
   store.setLoading(true)
@@ -49,6 +57,9 @@ async function fetchMeetingsData() {
       if (saved) store.setMeetings(JSON.parse(saved))
       return
     }
+
+    // Trigger calendar sync (fire-and-forget, then re-fetch)
+    await syncCalendar()
 
     const supabase = createClient()
     const { data } = await supabase.from('meetings').select('*').order('scheduled_at', { ascending: false })
@@ -120,8 +131,23 @@ export function useMeetings() {
     fetchMeetingsData()
 
     // Check every 60s for meetings that should be auto-completed
-    const interval = setInterval(autoCompletePastMeetings, 60_000)
-    return () => clearInterval(interval)
+    const autoCompleteInterval = setInterval(autoCompletePastMeetings, 60_000)
+
+    // Sync Google Calendar every 5 minutes
+    const syncInterval = setInterval(async () => {
+      if (IS_DEMO) return
+      await syncCalendar()
+      // Re-fetch meetings to pick up synced ones
+      const supabase = createClient()
+      const { data } = await supabase.from('meetings').select('*').order('scheduled_at', { ascending: false })
+      if (data) useMeetingStore.getState().setMeetings(data)
+      autoCompletePastMeetings()
+    }, 300_000)
+
+    return () => {
+      clearInterval(autoCompleteInterval)
+      clearInterval(syncInterval)
+    }
   }, [])
 
   const createMeeting = async (data: Partial<Meeting>) => {
@@ -139,6 +165,8 @@ export function useMeetings() {
         transcript: null,
         ai_summary: null,
         calendar_event_id: null,
+        google_meet_url: null,
+        source: 'kira',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }

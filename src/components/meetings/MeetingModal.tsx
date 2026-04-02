@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useUIStore } from '@/stores/uiStore'
 import { useMeetings } from '@/lib/hooks/useMeetings'
-import { Sparkles, PenLine, Loader2 } from 'lucide-react'
+import { Sparkles, PenLine, Loader2, FileText, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Meeting } from '@/types/meeting'
 
@@ -33,6 +33,9 @@ export function MeetingModal() {
   const [transcript, setTranscript] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [fetchingTranscript, setFetchingTranscript] = useState(false)
+  const [digestLoading, setDigestLoading] = useState(false)
+  const [digestResult, setDigestResult] = useState<{ summary: string; tasks_created: number } | null>(null)
 
   useEffect(() => {
     if (isEdit && existing) {
@@ -95,6 +98,40 @@ export function MeetingModal() {
     } finally {
       setAiLoading(false)
     }
+  }
+
+  const handleFetchTranscript = async () => {
+    if (!existing?.id) return
+    setFetchingTranscript(true)
+    try {
+      const res = await fetch(`/api/calendar/transcripts?meetingId=${existing.id}`)
+      const data = await res.json()
+      if (data.found) {
+        // Re-fetch from DB would be ideal, but we can just show a success message
+        if (!data.already_exists) {
+          setTranscript('[Transcripcion guardada — recarga para ver]')
+        }
+      }
+    } catch { /* ignore */ }
+    finally { setFetchingTranscript(false) }
+  }
+
+  const handleDigest = async () => {
+    if (!existing?.id) return
+    setDigestLoading(true)
+    setDigestResult(null)
+    try {
+      const res = await fetch('/api/ai/meeting-digest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId: existing.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setDigestResult({ summary: data.summary, tasks_created: data.tasks_created })
+      }
+    } catch { /* ignore */ }
+    finally { setDigestLoading(false) }
   }
 
   const handleSubmit = async () => {
@@ -253,20 +290,73 @@ export function MeetingModal() {
                 />
               </div>
               {isEdit && existing?.status === 'completed' && (
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1.5 block">
-                    📝 Transcripción
-                  </Label>
-                  <Textarea
-                    placeholder="Pega aquí la transcripción del meeting..."
-                    value={transcript}
-                    onChange={(e) => setTranscript(e.target.value)}
-                    className="bg-secondary min-h-[120px] text-sm"
-                  />
-                  {transcript.trim() && (
-                    <p className="text-[10px] text-muted-foreground/60 mt-1">
-                      {transcript.trim().split(/\s+/).length} palabras
-                    </p>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">
+                      Transcripcion
+                    </Label>
+                    <Textarea
+                      placeholder="Pega aqui la transcripcion del meeting..."
+                      value={transcript}
+                      onChange={(e) => setTranscript(e.target.value)}
+                      className="bg-secondary min-h-[120px] text-sm"
+                    />
+                    {transcript.trim() && (
+                      <p className="text-[10px] text-muted-foreground/60 mt-1">
+                        {transcript.trim().split(/\s+/).length} palabras
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action buttons for completed meetings */}
+                  <div className="flex flex-wrap gap-2">
+                    {existing.calendar_event_id && !existing.transcript && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleFetchTranscript}
+                        disabled={fetchingTranscript}
+                        className="h-8 text-xs"
+                      >
+                        {fetchingTranscript
+                          ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Buscando...</>
+                          : <><FileText className="h-3 w-3 mr-1" /> Buscar transcripcion en Drive</>
+                        }
+                      </Button>
+                    )}
+                    {(existing.transcript || transcript.trim()) && !existing.ai_summary && !digestResult && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDigest}
+                        disabled={digestLoading}
+                        className="h-8 text-xs border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                      >
+                        {digestLoading
+                          ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Generando...</>
+                          : <><Zap className="h-3 w-3 mr-1" /> Generar resumen + tareas AI</>
+                        }
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Show digest result */}
+                  {(digestResult || existing.ai_summary) && (
+                    <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
+                      <p className="text-[11px] font-medium text-purple-400 mb-2 flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" /> Resumen AI
+                      </p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                        {digestResult?.summary || existing.ai_summary}
+                      </p>
+                      {digestResult?.tasks_created ? (
+                        <p className="text-[10px] text-[#00D4FF] mt-2">
+                          {digestResult.tasks_created} tareas creadas automaticamente
+                        </p>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               )}

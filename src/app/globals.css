@@ -232,6 +232,66 @@
   animation: kira-glow-breathe 3s ease-in-out infinite;
 }
 
+/* ============================================
+   KIRA HOME — Progress Ring
+   ============================================ */
+
+@keyframes kira-ring-draw {
+  from { stroke-dashoffset: var(--ring-circumference); }
+  to { stroke-dashoffset: var(--ring-offset); }
+}
+
+@keyframes kira-ring-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(0,212,255,0.3)); }
+  50% { filter: drop-shadow(0 0 10px rgba(0,212,255,0.6)); }
+}
+
+.kira-ring-progress {
+  animation: kira-ring-draw 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+             kira-ring-glow 3s ease-in-out 1.2s infinite;
+  stroke-linecap: round;
+}
+
+/* Staggered fade-in for home sections */
+@keyframes kira-section-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.kira-section-stagger > * {
+  opacity: 0;
+  animation: kira-section-in 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.kira-section-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.kira-section-stagger > *:nth-child(2) { animation-delay: 80ms; }
+.kira-section-stagger > *:nth-child(3) { animation-delay: 160ms; }
+.kira-section-stagger > *:nth-child(4) { animation-delay: 240ms; }
+.kira-section-stagger > *:nth-child(5) { animation-delay: 320ms; }
+.kira-section-stagger > *:nth-child(6) { animation-delay: 400ms; }
+
+/* Horizontal scroll snap for mobile cards */
+.kira-snap-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.kira-snap-x > * {
+  scroll-snap-align: start;
+}
+
+/* Subtle gradient background for hero */
+.kira-hero-gradient {
+  background: radial-gradient(ellipse at 50% 0%, rgba(0,212,255,0.06) 0%, transparent 70%);
+}
+
+/* Meeting timeline dot pulse */
+@keyframes kira-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,212,255,0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(0,212,255,0); }
+}
+.kira-dot-live {
+  animation: kira-dot-pulse 2s ease-in-out infinite;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

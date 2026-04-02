@@ -1,6 +1,6 @@
 'use client'
 
-import { Calendar, Clock, Users, MoreHorizontal, FileText } from 'lucide-react'
+import { Calendar, Clock, Users, MoreHorizontal, FileText, Sparkles, Video } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
@@ -66,18 +66,36 @@ export function MeetingCard({ meeting, onEdit, onComplete, onCancel, onDelete }:
               {meeting.participants}
             </span>
           )}
+          {meeting.google_meet_url && (
+            <a
+              href={meeting.google_meet_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[#4285F4] hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Video className="h-3 w-3" />
+              Meet
+            </a>
+          )}
           {meeting.status === 'completed' && (
             meeting.transcript ? (
               <span className="flex items-center gap-1 text-green-400">
                 <FileText className="h-3 w-3" />
-                Transcripción
+                Transcripcion
               </span>
             ) : (
               <span className="flex items-center gap-1 text-amber-400">
                 <FileText className="h-3 w-3" />
-                Sin transcripción
+                Sin transcripcion
               </span>
             )
+          )}
+          {meeting.ai_summary && (
+            <span className="flex items-center gap-1 text-purple-400">
+              <Sparkles className="h-3 w-3" />
+              Resumen AI
+            </span>
           )}
         </div>
       </div>

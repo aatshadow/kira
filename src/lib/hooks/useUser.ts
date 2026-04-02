@@ -14,6 +14,7 @@ interface UserProfile {
   work_days: number[]
   theme: string
   default_view: string
+  onboarding_completed: boolean
 }
 
 export function useUser() {
@@ -32,6 +33,7 @@ export function useUser() {
         work_days: [1, 2, 3, 4, 5],
         theme: 'dark',
         default_view: 'list',
+        onboarding_completed: false,
       })
       setLoading(false)
       return
@@ -78,6 +80,7 @@ export function useUser() {
             work_days: newProfile.work_days || [1, 2, 3, 4, 5],
             theme: newProfile.theme || 'dark',
             default_view: newProfile.default_view || 'list',
+            onboarding_completed: newProfile.onboarding_completed ?? false,
           })
         }
       } else {
@@ -91,6 +94,7 @@ export function useUser() {
           work_days: profile.work_days || [1, 2, 3, 4, 5],
           theme: profile.theme || 'dark',
           default_view: profile.default_view || 'list',
+          onboarding_completed: profile.onboarding_completed ?? false,
         })
       }
 

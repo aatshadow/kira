@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { useUser } from '@/lib/hooks/useUser'
 import { TopBar } from '@/components/layout/TopBar'
 import { TimerFloat } from '@/components/layout/TimerFloat'
@@ -9,6 +10,7 @@ import { TaskCloseModal } from '@/components/tasks/TaskCloseModal'
 import { TimerStopModal } from '@/components/timer/TimerStopModal'
 import { MeetingModal } from '@/components/meetings/MeetingModal'
 import { CreateTaskFAB } from '@/components/shared/CreateTaskFAB'
+import { Onboarding } from '@/components/onboarding/Onboarding'
 import { useUIStore } from '@/stores/uiStore'
 
 export default function DashboardLayout({
@@ -17,9 +19,15 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const { openModal } = useUIStore()
+  const { user, loading } = useUser()
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
-  // Ensure profile exists on first load
-  useUser()
+  // Show onboarding for new users
+  useEffect(() => {
+    if (!loading && user && !user.onboarding_completed) {
+      setShowOnboarding(true)
+    }
+  }, [loading, user])
 
   // Keyboard shortcut: C to create task
   useEffect(() => {
@@ -56,6 +64,16 @@ export default function DashboardLayout({
       <TaskCloseModal />
       <TimerStopModal />
       <MeetingModal />
+
+      {/* Onboarding overlay */}
+      <AnimatePresence>
+        {showOnboarding && user && (
+          <Onboarding
+            userId={user.id}
+            onComplete={() => setShowOnboarding(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

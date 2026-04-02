@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { getGreeting, formatDate } from '@/lib/utils/time'
 import { useTaskStore } from '@/stores/taskStore'
 import { useMeetingStore } from '@/stores/meetingStore'
@@ -13,6 +14,65 @@ interface DayStatusProps {
   calendarEventsMins?: number
 }
 
+function ProgressRing({ progress, totalLabel, goalLabel }: { progress: number; totalLabel: string; goalLabel: string }) {
+  const size = 148
+  const stroke = 7
+  const radius = (size - stroke) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (Math.min(progress, 100) / 100) * circumference
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg width={size} height={size} className="-rotate-90">
+        {/* Background ring */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          className="text-[#1a1a1a]"
+        />
+        {/* Progress ring — animated */}
+        {progress > 0 && (
+          <motion.circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="url(#kira-ring-gradient)"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1.4, ease: [0.4, 0, 0.2, 1], delay: 0.3 }}
+            style={{ filter: 'drop-shadow(0 0 6px rgba(0,212,255,0.4))' }}
+          />
+        )}
+        <defs>
+          <linearGradient id="kira-ring-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#00D4FF" />
+            <stop offset="50%" stopColor="#0096FF" />
+            <stop offset="100%" stopColor="#8B5CF6" />
+          </linearGradient>
+        </defs>
+      </svg>
+      {/* Center text */}
+      <motion.div
+        className="absolute inset-0 flex flex-col items-center justify-center"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, delay: 0.6 }}
+      >
+        <span className="text-[28px] font-semibold font-mono text-foreground leading-none tracking-tight">{totalLabel}</span>
+        <span className="text-[10px] text-muted-foreground mt-1.5 font-medium">de {goalLabel}</span>
+      </motion.div>
+    </div>
+  )
+}
+
 export function DayStatus({ dailyGoalHours, calendarEventsMins = 0 }: DayStatusProps) {
   const { tasks } = useTaskStore()
   const { meetings } = useMeetingStore()
@@ -20,20 +80,16 @@ export function DayStatus({ dailyGoalHours, calendarEventsMins = 0 }: DayStatusP
 
   const [operativaMins, setOperativaMins] = useState(0)
 
-  // Fetch actual worked time from timer_sessions
   useEffect(() => {
     if (IS_DEMO) return
-
     async function fetchWorkedTime() {
       const userId = await getUserId()
       if (!userId) return
-
       const supabase = createClient()
       const startOfDay = new Date()
       startOfDay.setHours(0, 0, 0, 0)
       const endOfDay = new Date()
       endOfDay.setHours(23, 59, 59, 999)
-
       const { data, error } = await supabase
         .from('timer_sessions')
         .select('started_at, ended_at')
@@ -41,63 +97,36 @@ export function DayStatus({ dailyGoalHours, calendarEventsMins = 0 }: DayStatusP
         .eq('status', 'completed')
         .gte('started_at', startOfDay.toISOString())
         .lte('started_at', endOfDay.toISOString())
-
       if (error || !data) return
-
       let totalSecs = 0
       for (const session of data) {
         if (session.started_at && session.ended_at) {
-          const start = new Date(session.started_at).getTime()
-          const end = new Date(session.ended_at).getTime()
-          totalSecs += (end - start) / 1000
+          totalSecs += (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 1000
         }
       }
       setOperativaMins(Math.round(totalSecs / 60))
     }
-
     fetchWorkedTime()
     const interval = setInterval(fetchWorkedTime, 60000)
     return () => clearInterval(interval)
   }, [])
 
-  // Meetings time: completed KIRA meetings + Google Calendar events
   const meetingsMins = useMemo(() => {
     const todayStr = today.toDateString()
-    const kiraMeetingsMins = meetings
-      .filter(
-        (m) =>
-          m.status === 'completed' &&
-          m.scheduled_at &&
-          new Date(m.scheduled_at).toDateString() === todayStr &&
-          m.duration_mins
-      )
-      .reduce((sum, m) => sum + (m.duration_mins || 0), 0)
-
-    return kiraMeetingsMins + calendarEventsMins
+    return meetings
+      .filter((m) => m.status === 'completed' && m.scheduled_at && new Date(m.scheduled_at).toDateString() === todayStr && m.duration_mins)
+      .reduce((sum, m) => sum + (m.duration_mins || 0), 0) + calendarEventsMins
   }, [meetings, calendarEventsMins, today])
 
   const totalWorkedMins = operativaMins + meetingsMins
 
   const completedToday = useMemo(
-    () =>
-      tasks.filter(
-        (t) =>
-          t.status === 'done' &&
-          t.completed_at &&
-          new Date(t.completed_at).toDateString() === today.toDateString()
-      ).length,
+    () => tasks.filter((t) => t.status === 'done' && t.completed_at && new Date(t.completed_at).toDateString() === today.toDateString()).length,
     [tasks, today]
   )
 
   const plannedToday = useMemo(
-    () =>
-      tasks.filter(
-        (t) =>
-          ['todo', 'in_progress'].includes(t.status) ||
-          (t.status === 'done' &&
-            t.completed_at &&
-            new Date(t.completed_at).toDateString() === today.toDateString())
-      ).length,
+    () => tasks.filter((t) => ['todo', 'in_progress'].includes(t.status) || (t.status === 'done' && t.completed_at && new Date(t.completed_at).toDateString() === today.toDateString())).length,
     [tasks, today]
   )
 
@@ -110,57 +139,66 @@ export function DayStatus({ dailyGoalHours, calendarEventsMins = 0 }: DayStatusP
     return h > 0 ? `${h}h ${m}m` : `${m}m`
   }
 
+  const totalLabel = totalWorkedMins >= 60
+    ? `${Math.floor(totalWorkedMins / 60)}:${String(totalWorkedMins % 60).padStart(2, '0')}`
+    : `${totalWorkedMins}m`
+
+  const statItems = [
+    { label: 'Operativa', value: fmtTime(operativaMins), color: '#00D4FF' },
+    { label: 'Meetings', value: fmtTime(meetingsMins), color: '#8B5CF6' },
+    { label: 'Tasks', value: `${completedToday}/${plannedToday}`, color: '#22C55A' },
+  ]
+
   return (
-    <div className="rounded-xl border border-border bg-card p-4 md:p-6">
-      <div className="flex items-start justify-between mb-3 md:mb-4">
-        <div>
-          <h2 className="text-lg md:text-xl font-bold text-foreground mb-0.5">{getGreeting()}, Alex</h2>
-          <p className="text-xs md:text-sm text-muted-foreground capitalize">{formatDate(today)}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[11px] md:text-sm text-muted-foreground">Tasks</p>
-          <p className="text-base md:text-lg font-semibold text-foreground">
-            {completedToday}
-            <span className="text-muted-foreground font-normal">/{plannedToday}</span>
-          </p>
-        </div>
-      </div>
+    <motion.div
+      className="relative overflow-hidden rounded-2xl px-5 py-6 md:px-8 md:py-8"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {/* Ambient glow background */}
+      <div className="absolute inset-0 kira-hero-gradient pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[200px] h-[200px] rounded-full bg-[rgba(0,212,255,0.03)] blur-[80px] pointer-events-none" />
 
-      {/* Three time metrics */}
-      <div className="grid grid-cols-3 gap-2 md:gap-3 mb-3 md:mb-4">
-        <div className="rounded-lg bg-[rgba(0,212,255,0.06)] border border-[rgba(0,212,255,0.1)] px-2.5 py-2 md:px-3">
-          <p className="text-[10px] md:text-[11px] text-[#00D4FF]/70 uppercase tracking-wider">Total</p>
-          <p className="text-sm md:text-base font-semibold font-mono text-[#00D4FF]">{fmtTime(totalWorkedMins)}</p>
-        </div>
-        <div className="rounded-lg bg-secondary/50 px-2.5 py-2 md:px-3">
-          <p className="text-[10px] md:text-[11px] text-muted-foreground uppercase tracking-wider">Operativa</p>
-          <p className="text-sm md:text-base font-semibold font-mono text-foreground">{fmtTime(operativaMins)}</p>
-        </div>
-        <div className="rounded-lg bg-secondary/50 px-2.5 py-2 md:px-3">
-          <p className="text-[10px] md:text-[11px] text-muted-foreground uppercase tracking-wider">Meetings</p>
-          <p className="text-sm md:text-base font-semibold font-mono text-foreground">{fmtTime(meetingsMins)}</p>
-        </div>
-      </div>
+      <div className="relative">
+        {/* Greeting */}
+        <motion.div
+          className="mb-6"
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
+          <h2 className="text-xl md:text-2xl font-bold text-foreground">{getGreeting()}, Alex</h2>
+          <p className="text-sm text-muted-foreground capitalize mt-0.5">{formatDate(today)}</p>
+        </motion.div>
 
-      {/* Progress bar */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[11px] text-muted-foreground">Progreso del día</span>
-          <span className="text-[11px] font-mono text-foreground">
-            {fmtTime(totalWorkedMins)} / {dailyGoalHours}h
-          </span>
-        </div>
-        <div className="relative h-2 rounded-full bg-secondary overflow-hidden">
-          <div
-            className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
-            style={{
-              width: `${progress}%`,
-              background: 'linear-gradient(90deg, #00D4FF, #0096FF)',
-              boxShadow: progress > 0 ? '0 0 12px rgba(0, 212, 255, 0.4)' : 'none',
-            }}
+        {/* Ring + Stats */}
+        <div className="flex items-center gap-6 md:gap-10">
+          <ProgressRing
+            progress={progress}
+            totalLabel={totalLabel}
+            goalLabel={`${dailyGoalHours}h`}
           />
+
+          <div className="flex-1 space-y-3.5">
+            {statItems.map((item, i) => (
+              <motion.div
+                key={item.label}
+                className="flex items-center justify-between"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.4 + i * 0.1 }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-[13px] text-muted-foreground">{item.label}</span>
+                </div>
+                <span className="text-sm font-mono font-semibold text-foreground">{item.value}</span>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

@@ -204,7 +204,7 @@ You can execute actions by including JSON action blocks in your response:
 
 \`\`\`kira-action
 {
-  "action": "create_task" | "edit_task" | "delete_task" | "create_meeting" | "edit_meeting" | "delete_meeting" | "save_memory" | "delete_memory" | "create_calendar_event" | "update_calendar_event" | "delete_calendar_event" | "create_category" | "create_project",
+  "action": "create_task" | "edit_task" | "delete_task" | "create_meeting" | "edit_meeting" | "delete_meeting" | "save_memory" | "delete_memory" | "create_calendar_event" | "update_calendar_event" | "delete_calendar_event" | "create_category" | "create_project" | "sync_calendar" | "digest_meeting",
   "data": { ... }
 }
 \`\`\`
@@ -249,6 +249,12 @@ You can execute actions by including JSON action blocks in your response:
 
 **create_project** (create a new project):
 { "name": "string", "description": "string|null" }
+
+**sync_calendar** (force a Google Calendar sync now — imports events into KIRA meetings):
+{ }
+
+**digest_meeting** (generate AI summary + create tasks from a completed meeting's transcript):
+{ "id": "meeting_id" }
 
 ## Priority Matrix (Eisenhower):
 - q1: Urgente + Importante
@@ -574,6 +580,54 @@ You can execute actions by including JSON action blocks in your response:
               .eq('user_id', user.id)
               .ilike('content', `%${content_match}%`)
             actionResults.push({ action: 'delete_memory', success: !error, error: error?.message })
+            break
+          }
+          case 'sync_calendar': {
+            try {
+              const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
+              const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
+              const syncRes = await fetch(`${baseUrl}/api/calendar/sync`, {
+                method: 'POST',
+                headers: { cookie: request.headers.get('cookie') || '' },
+              })
+              const syncData = await syncRes.json()
+              actionResults.push({
+                action: 'sync_calendar',
+                success: syncRes.ok,
+                error: syncRes.ok ? undefined : syncData.error,
+              })
+            } catch (syncErr) {
+              actionResults.push({ action: 'sync_calendar', success: false, error: syncErr instanceof Error ? syncErr.message : 'Sync failed' })
+            }
+            break
+          }
+          case 'digest_meeting': {
+            const { id: digestMeetingId } = act.data as { id: string }
+            if (!digestMeetingId) {
+              actionResults.push({ action: 'digest_meeting', success: false, error: 'Missing meeting id' })
+              break
+            }
+            try {
+              const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
+              const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
+              const digestRes = await fetch(`${baseUrl}/api/ai/meeting-digest`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  cookie: request.headers.get('cookie') || '',
+                },
+                body: JSON.stringify({ meetingId: digestMeetingId }),
+              })
+              const digestData = await digestRes.json()
+              actionResults.push({
+                action: 'digest_meeting',
+                success: digestRes.ok,
+                id: digestMeetingId,
+                error: digestRes.ok ? undefined : digestData.error,
+              })
+            } catch (digestErr) {
+              actionResults.push({ action: 'digest_meeting', success: false, error: digestErr instanceof Error ? digestErr.message : 'Digest failed' })
+            }
             break
           }
         }
