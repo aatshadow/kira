@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { Bot, Video, MessageCircle, ListTodo, BarChart3, Plus, ExternalLink, Settings } from 'lucide-react'
+import { Bot, Video, MessageCircle, ListTodo, BarChart3, Plus, ExternalLink, Settings, Inbox } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useMeetingStore } from '@/stores/meetingStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -39,7 +39,7 @@ export function ControlCenterGrid() {
     { id: 'kira', label: 'KIRA', subtitle: 'Hablar con KIRA', icon: Bot, color: '#00D4FF', href: '/kira' },
     { id: 'agents', label: 'Agentes', subtitle: 'Integraciones', icon: Settings, color: '#8B5CF6', href: '/kira?tab=agents' },
     { id: 'meetings', label: 'Meetings', subtitle: todayMeetings > 0 ? `${todayMeetings} hoy` : 'Sin meetings', icon: Video, color: '#3B82F6', href: '/management/meetings', badge: todayMeetings || undefined },
-    { id: 'whatsapp', label: 'WhatsApp', subtitle: 'Mensajes', icon: MessageCircle, color: '#25D366', href: '/kira' },
+    { id: 'inbox', label: 'Inbox', subtitle: 'Todos los mensajes', icon: Inbox, color: '#8B5CF6', href: '/inbox' },
     { id: 'tasks', label: 'Tasks', subtitle: pendingTasks > 0 ? `${pendingTasks} pendientes` : 'Todo al dia', icon: ListTodo, color: '#00D4FF', href: '/management/tasks', badge: pendingTasks || undefined },
     { id: 'analytics', label: 'Analytics', subtitle: 'Metricas', icon: BarChart3, color: '#888', href: '/analytics' },
     { id: 'central', label: 'Consola Central', subtitle: 'Black Wolf', icon: ExternalLink, color: '#F97316', externalHref: 'https://central.blackwolfsec.io', colSpan: 2 },
