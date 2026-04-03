@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useUser } from '@/lib/hooks/useUser'
 import { TopBar } from '@/components/layout/TopBar'
+import { AppDock } from '@/components/layout/AppDock'
 import { TimerFloat } from '@/components/layout/TimerFloat'
 import { TaskModal } from '@/components/tasks/TaskModal'
 import { TaskCloseModal } from '@/components/tasks/TaskCloseModal'
 import { TimerStopModal } from '@/components/timer/TimerStopModal'
 import { MeetingModal } from '@/components/meetings/MeetingModal'
-import { CreateTaskFAB } from '@/components/shared/CreateTaskFAB'
 import { Onboarding } from '@/components/onboarding/Onboarding'
 import { useUIStore } from '@/stores/uiStore'
 
@@ -51,13 +51,15 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
-      <main className="pt-[calc(4rem+env(safe-area-inset-top))] md:pt-14 px-[max(1rem,env(safe-area-inset-left))] md:px-6 lg:px-10 pb-[calc(5rem+env(safe-area-inset-bottom))] max-w-[1400px] mx-auto">
+      <main className="pt-[calc(4rem+env(safe-area-inset-top))] md:pt-14 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8 max-w-[1400px] mx-auto">
         {children}
       </main>
 
+      {/* Mobile app dock */}
+      <AppDock />
+
       {/* Global floating elements */}
       <TimerFloat />
-      <CreateTaskFAB />
 
       {/* Global modals */}
       <TaskModal />

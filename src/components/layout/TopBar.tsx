@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Clock, User, LayoutGrid, ChevronDown, Home, FolderKanban, Bot, BarChart3, Settings, Calendar, ListTodo, Users, Repeat, Inbox } from 'lucide-react'
+import { Clock, User, Home, FolderKanban, Bot, BarChart3, Settings, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTimerStore } from '@/stores/timerStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { KiraLogo } from '@/components/shared/KiraLogo'
 
 const navLinks = [
-  { href: '/', label: 'Consola Central', icon: Home },
+  { href: '/', label: 'Home', icon: Home },
   { href: '/management', label: 'Management', icon: FolderKanban },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
   { href: '/kira', label: 'KIRA', icon: Bot },
@@ -21,169 +21,51 @@ const navLinks = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-const managementSubs = [
-  { href: '/management/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/management/tasks', label: 'Tasks', icon: ListTodo },
-  { href: '/management/meetings', label: 'Meetings', icon: Users },
-  { href: '/management/habits', label: 'Hábitos', icon: Repeat },
-]
-
 export function TopBar() {
   const pathname = usePathname()
   const { sessions, activeSessionId } = useTimerStore()
   const { toggleTimerFloat } = useUIStore()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
 
   const activeSession = sessions.find((s) => s.id === activeSessionId)
   const hasActive = !!activeSession
 
-  const currentSection = navLinks.find(
-    (l) => l.href === '/' ? pathname === '/' : pathname.startsWith(l.href)
-  )
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMobileMenuOpen(false)
-      }
-    }
-    if (mobileMenuOpen) {
-      document.addEventListener('mousedown', handleClick)
-      return () => document.removeEventListener('mousedown', handleClick)
-    }
-  }, [mobileMenuOpen])
-
-  useEffect(() => {
-    setMobileMenuOpen(false)
-  }, [pathname])
-
   return (
     <motion.header
-      className="fixed top-0 left-0 right-0 z-50 md:h-14 md:border-b md:border-border/50 md:bg-background/85 md:backdrop-blur-xl"
+      className="fixed top-0 left-0 right-0 z-50"
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* Mobile: floating pill header */}
-      <div className="md:hidden mx-3" style={{ marginTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
-        <div className="flex h-12 items-center justify-between px-4 glass-card">
-          <Link href="/" className="shrink-0 flex items-center gap-1.5">
-            <KiraLogo size="sm" />
-            <span className="text-xs font-bold tracking-[0.12em] text-foreground">KIRA</span>
-          </Link>
+      {/* Mobile: minimal top bar */}
+      <div className="md:hidden flex items-center justify-between px-5 h-12" style={{ marginTop: 'max(0.25rem, env(safe-area-inset-top))' }}>
+        <Link href="/" className="flex items-center gap-1.5">
+          <KiraLogo size="sm" />
+          <span className="text-[11px] font-bold tracking-[0.12em] text-foreground">KIRA</span>
+        </Link>
 
-          <div ref={menuRef} className="relative">
-            <motion.button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              whileTap={{ scale: 0.95 }}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all cursor-pointer backdrop-blur-sm',
-                mobileMenuOpen
-                  ? 'bg-[rgba(0,212,255,0.08)] border border-[rgba(0,212,255,0.2)] text-[#00D4FF]'
-                  : 'bg-white/[0.04] border border-white/[0.08] text-muted-foreground'
-              )}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span>{currentSection?.label || 'Sections'}</span>
-              <ChevronDown className={cn('h-3 w-3 transition-transform', mobileMenuOpen && 'rotate-180')} />
-            </motion.button>
-
-            <AnimatePresence>
-              {mobileMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute top-full right-0 mt-2 w-56 rounded-2xl border border-white/[0.1] bg-[#141414]/95 backdrop-blur-2xl shadow-[0_16px_48px_rgba(0,0,0,0.6)] overflow-hidden origin-top-right"
-                >
-                  <div className="p-1.5">
-                    {navLinks.map((link) => {
-                      const Icon = link.icon
-                      const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href)
-                      const isManagement = link.href === '/management'
-                      const showSubs = isManagement && pathname.startsWith('/management')
-                      return (
-                        <div key={link.href}>
-                          <Link
-                            href={isManagement ? '/management/tasks' : link.href}
-                            className={cn(
-                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-                              isActive
-                                ? 'text-[#00D4FF] bg-[rgba(0,212,255,0.08)]'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.06]'
-                            )}
-                          >
-                            <Icon className="h-4 w-4" />
-                            {link.label}
-                          </Link>
-                          {isManagement && (showSubs || isActive) && (
-                            <div className="ml-4 pl-3 border-l border-white/[0.06] my-0.5">
-                              {managementSubs.map((sub) => {
-                                const SubIcon = sub.icon
-                                const subActive = pathname === sub.href
-                                return (
-                                  <Link
-                                    key={sub.href}
-                                    href={sub.href}
-                                    className={cn(
-                                      'flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors',
-                                      subActive
-                                        ? 'text-[#00D4FF] bg-[rgba(0,212,255,0.06)]'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
-                                    )}
-                                  >
-                                    <SubIcon className="h-3.5 w-3.5" />
-                                    {sub.label}
-                                  </Link>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          {hasActive && (
             <motion.button
               onClick={toggleTimerFloat}
               whileTap={{ scale: 0.93 }}
-              className={cn(
-                'flex items-center gap-1.5 px-2 py-1 rounded-full transition-all cursor-pointer',
-                hasActive
-                  ? 'bg-[rgba(0,212,255,0.08)] border border-[rgba(0,212,255,0.25)]'
-                  : 'hover:bg-secondary'
-              )}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[rgba(0,212,255,0.08)] border border-[rgba(0,212,255,0.25)] cursor-pointer"
             >
-              {hasActive ? (
-                <>
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#00D4FF] animate-kira-pulse" />
-                  <span className="text-[10px] font-mono text-[#00D4FF]">
-                    {formatTime(activeSession.elapsedSecs)}
-                  </span>
-                </>
-              ) : (
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              )}
+              <span className="h-1.5 w-1.5 rounded-full bg-[#00D4FF] animate-kira-pulse" />
+              <span className="text-[10px] font-mono text-[#00D4FF]">
+                {formatTime(activeSession.elapsedSecs)}
+              </span>
             </motion.button>
-
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-[9px] bg-secondary text-foreground">
-                <User className="h-3 w-3" />
-              </AvatarFallback>
-            </Avatar>
-          </div>
+          )}
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="text-[9px] bg-white/[0.06] text-foreground">
+              <User className="h-3 w-3" />
+            </AvatarFallback>
+          </Avatar>
         </div>
       </div>
 
       {/* Desktop: classic header */}
-      <div className="hidden md:flex h-14 items-center px-6 lg:px-10 max-w-[1400px] mx-auto">
+      <div className="hidden md:flex h-14 items-center px-6 lg:px-10 max-w-[1400px] mx-auto border-b border-border/50 bg-background/85 backdrop-blur-xl">
         <Link href="/" className="mr-8 shrink-0 flex items-center gap-2">
           <KiraLogo size="sm" />
           <span className="text-sm font-bold tracking-[0.15em] text-foreground">KIRA</span>

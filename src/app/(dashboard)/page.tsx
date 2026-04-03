@@ -1,211 +1,267 @@
 'use client'
 
-import { useMemo, useEffect, useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { DayStatus } from '@/components/dashboard/DayStatus'
-import { ControlCenterGrid } from '@/components/dashboard/ControlCenterGrid'
-import { KiraOrb } from '@/components/dashboard/KiraOrb'
-import { useTasks } from '@/lib/hooks/useTasks'
-import { useMeetingStore } from '@/stores/meetingStore'
-import { useUIStore } from '@/stores/uiStore'
-import { useTimer } from '@/lib/hooks/useTimer'
-import { IS_DEMO } from '@/lib/demo'
-import { format, isToday as isTodayFn, differenceInMinutes } from 'date-fns'
+import { useRouter } from 'next/navigation'
+import { MessageSquare, ChevronRight, Mic, MicOff } from 'lucide-react'
+import { KiraLogo } from '@/components/shared/KiraLogo'
+import { cn } from '@/lib/utils'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { staggerContainer, fadeUp } from '@/lib/animations'
-import { Video, Clock } from 'lucide-react'
-import Link from 'next/link'
 
-interface CalendarEvent {
+interface Conversation {
   id: string
   title: string
-  start: string
-  end: string
-  attendees?: string
+  updated_at: string
 }
 
-interface UnifiedMeeting {
-  id: string
-  title: string
-  dateTime: Date
-  endTime?: Date
-  participants: string | null
-  source: 'kira' | 'gcal'
-  durationMins: number | null
-}
+export default function HomePage() {
+  const router = useRouter()
+  const [now, setNow] = useState(new Date())
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [listeningMode, setListeningMode] = useState<'off' | 'active' | 'persistent'>('off')
+  const lastTapRef = useRef(0)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-export default function DashboardPage() {
-  useTasks()
-  const { meetings } = useMeetingStore()
-  const { openTimerFloat } = useUIStore()
-  const { activeSession } = useTimer()
-
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
-
+  // Update clock every minute
   useEffect(() => {
-    if (IS_DEMO) return
-    async function fetchCalendarEvents() {
-      try {
-        const now = new Date()
-        const timeMax = new Date()
-        timeMax.setDate(timeMax.getDate() + 2)
-        const res = await fetch(`/api/calendar/events?timeMin=${now.toISOString()}&timeMax=${timeMax.toISOString()}`)
-        if (!res.ok) return
-        const data = await res.json()
-        setCalendarEvents(data.events || [])
-      } catch { /* ignore */ }
-    }
-    fetchCalendarEvents()
+    const interval = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(interval)
   }, [])
 
-  const calendarEventsMinsToday = useMemo(() => {
-    const todayStr = new Date().toDateString()
-    return calendarEvents
-      .filter((e) => new Date(e.start).toDateString() === todayStr && new Date(e.end) <= new Date())
-      .reduce((sum, e) => sum + Math.round((new Date(e.end).getTime() - new Date(e.start).getTime()) / 60000), 0)
-  }, [calendarEvents])
+  // Load recent conversations
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch('/api/ai/conversations')
+        if (res.ok) {
+          const data = await res.json()
+          setConversations((data.conversations || []).slice(0, 3))
+        }
+      } catch { /* ignore */ }
+    }
+    load()
+  }, [])
 
-  // All today's meetings (KIRA + Google Cal)
-  const todayMeetings = useMemo(() => {
-    const now = new Date()
-    const todayStr = now.toDateString()
-    const unified: UnifiedMeeting[] = []
-
-    meetings
-      .filter((m) => m.scheduled_at && new Date(m.scheduled_at).toDateString() === todayStr && m.status !== 'cancelled')
-      .forEach((m) => unified.push({
-        id: m.id, title: m.title, dateTime: new Date(m.scheduled_at!),
-        participants: m.participants, source: 'kira', durationMins: m.duration_mins,
-      }))
-
-    calendarEvents
-      .filter((e) => new Date(e.start).toDateString() === todayStr)
-      .forEach((e) => {
-        // Skip duplicates already in KIRA meetings
-        if (unified.some((u) => u.title === e.title)) return
-        unified.push({
-          id: e.id, title: e.title, dateTime: new Date(e.start), endTime: new Date(e.end),
-          participants: e.attendees || null, source: 'gcal',
-          durationMins: Math.round((new Date(e.end).getTime() - new Date(e.start).getTime()) / 60000),
-        })
-      })
-
-    return unified.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
-  }, [meetings, calendarEvents])
-
-  const formatMeetingTime = (dt: Date) => {
-    const diffMins = differenceInMinutes(dt, new Date())
-    if (diffMins <= 0 && diffMins > -60) return 'Ahora'
-    return format(dt, 'HH:mm')
+  const formatTimeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins}m`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h`
+    return `${Math.floor(hours / 24)}d`
   }
+
+  // Double-tap: toggle persistent listening
+  // Single tap: one-shot listening (navigates to KIRA chat)
+  // Long press: persistent mode
+  const handleOrbTap = useCallback(() => {
+    const now = Date.now()
+    const timeSinceLastTap = now - lastTapRef.current
+    lastTapRef.current = now
+
+    if (timeSinceLastTap < 350) {
+      // Double tap
+      if (listeningMode === 'persistent') {
+        setListeningMode('off')
+      } else {
+        setListeningMode('persistent')
+      }
+    } else {
+      // Single tap — navigate to KIRA chat
+      if (listeningMode === 'off') {
+        router.push('/kira')
+      }
+    }
+  }, [listeningMode, router])
+
+  const handleOrbPressStart = useCallback(() => {
+    holdTimerRef.current = setTimeout(() => {
+      setListeningMode('persistent')
+    }, 600)
+  }, [])
+
+  const handleOrbPressEnd = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+  }, [])
+
+  const day = format(now, 'EEEE', { locale: es })
+  const date = format(now, 'd MMMM', { locale: es })
+  const time = format(now, 'HH:mm')
 
   return (
     <motion.div
-      className="px-5 pb-36 md:pb-8 md:px-8 max-w-[600px] mx-auto"
-      variants={staggerContainer}
-      initial="hidden"
-      animate="show"
+      className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] px-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
     >
-      {/* Today's Meetings Widget */}
-      {todayMeetings.length > 0 && (
-        <motion.div variants={fadeUp} className="pt-2 md:pt-4 mb-4">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-2">
-              <Video className="h-3.5 w-3.5 text-[#3B82F6]" />
-              <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Meetings hoy</h3>
-            </div>
-            <Link href="/management/meetings" className="text-[10px] text-[#00D4FF]/60 hover:text-[#00D4FF] transition-colors">
-              Ver todos
-            </Link>
-          </div>
-          <div className="space-y-1.5">
-            {todayMeetings.map((meeting) => {
-              const diffMins = differenceInMinutes(meeting.dateTime, new Date())
-              const isNow = diffMins <= 0 && diffMins > -60
-              const isNext = diffMins > 0 && diffMins <= 30
-
-              return (
-                <motion.div
-                  key={`${meeting.source}-${meeting.id}`}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-all ${
-                    isNow
-                      ? 'bg-[rgba(0,212,255,0.06)] border border-[rgba(0,212,255,0.15)]'
-                      : isNext
-                        ? 'bg-white/[0.03] border border-white/[0.08]'
-                        : 'bg-white/[0.02] border border-transparent'
-                  }`}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <span className="text-[11px] font-mono text-muted-foreground w-[42px] shrink-0 tabular-nums">
-                    {formatMeetingTime(meeting.dateTime)}
-                  </span>
-                  <motion.span
-                    className="h-1.5 w-1.5 rounded-full shrink-0"
-                    style={{ backgroundColor: isNow ? '#00D4FF' : meeting.source === 'kira' ? '#8B5CF6' : '#4285F4' }}
-                    animate={isNow ? { scale: [1, 1.5, 1], opacity: [1, 0.4, 1] } : {}}
-                    transition={isNow ? { duration: 2, repeat: Infinity } : {}}
-                  />
-                  <span className="text-[12px] text-foreground truncate flex-1">{meeting.title}</span>
-                  {meeting.durationMins && (
-                    <span className="text-[10px] text-muted-foreground/50 shrink-0">{meeting.durationMins}m</span>
-                  )}
-                </motion.div>
-              )
-            })}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Status Island */}
-      <motion.div variants={fadeUp}>
-        <DayStatus dailyGoalHours={8} calendarEventsMins={calendarEventsMinsToday} />
+      {/* Date & Time */}
+      <motion.div
+        className="text-center mb-10"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.5 }}
+      >
+        <p className="text-muted-foreground/60 text-xs font-medium uppercase tracking-[0.2em] mb-1">
+          {day}
+        </p>
+        <p className="text-muted-foreground text-sm">
+          {date}
+        </p>
+        <p className="text-5xl font-light text-foreground tabular-nums tracking-tight mt-1">
+          {time}
+        </p>
       </motion.div>
 
-      {/* Active session banner */}
-      <AnimatePresence>
-        {activeSession && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, marginTop: 0 }}
-            animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-            exit={{ opacity: 0, height: 0, marginTop: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <motion.div
-              onClick={openTimerFloat}
-              className="glass-card flex items-center gap-3 px-4 py-3.5 cursor-pointer"
-              whileTap={{ scale: 0.98 }}
-            >
+      {/* KIRA Orb — center piece */}
+      <motion.div
+        className="relative mb-12"
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 20 }}
+      >
+        {/* Outer glow rings */}
+        <AnimatePresence>
+          {listeningMode !== 'off' && (
+            <>
               <motion.div
-                className="h-2.5 w-2.5 rounded-full bg-[#00D4FF]"
-                animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }}
+                className="absolute inset-[-20px] rounded-full border border-[#00D4FF]/20"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+              />
+              <motion.div
+                className="absolute inset-[-40px] rounded-full border border-[#00D4FF]/10"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.05, 1] }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{activeSession.taskTitle}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {[activeSession.taskCategory, activeSession.taskProject].filter(Boolean).join(' · ')}
-                </p>
-              </div>
-              <span className="text-lg font-mono font-light text-[#00D4FF] tabular-nums" style={{ textShadow: '0 0 15px rgba(0,212,255,0.3)' }}>
-                {(() => {
-                  const h = Math.floor(activeSession.elapsedSecs / 3600)
-                  const m = Math.floor((activeSession.elapsedSecs % 3600) / 60)
-                  const s = activeSession.elapsedSecs % 60
-                  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-                })()}
-              </span>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <motion.div
+                className="absolute inset-[-60px] rounded-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{ background: 'radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%)' }}
+              />
+            </>
+          )}
+        </AnimatePresence>
 
-      {/* Control Center Grid */}
-      <motion.div variants={fadeUp} className="mt-5">
-        <ControlCenterGrid />
+        {/* Orb button */}
+        <motion.button
+          onClick={handleOrbTap}
+          onMouseDown={handleOrbPressStart}
+          onMouseUp={handleOrbPressEnd}
+          onTouchStart={handleOrbPressStart}
+          onTouchEnd={handleOrbPressEnd}
+          whileTap={{ scale: 0.9 }}
+          className={cn(
+            'relative h-28 w-28 rounded-full cursor-pointer flex items-center justify-center transition-shadow duration-500',
+            listeningMode === 'persistent'
+              ? 'shadow-[0_0_60px_rgba(0,212,255,0.4),0_0_120px_rgba(0,212,255,0.15)]'
+              : listeningMode === 'active'
+                ? 'shadow-[0_0_40px_rgba(0,212,255,0.3)]'
+                : 'shadow-[0_0_30px_rgba(0,212,255,0.15)]'
+          )}
+          style={{
+            background: 'linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(139,92,246,0.1) 100%)',
+            border: '1px solid rgba(0,212,255,0.2)',
+          }}
+        >
+          <div className="absolute inset-0 rounded-full bg-black/30" />
+          <div className="relative">
+            <KiraLogo size="xl" />
+          </div>
+
+          {/* Listening indicator */}
+          <AnimatePresence>
+            {listeningMode !== 'off' && (
+              <motion.div
+                className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-[#00D4FF] flex items-center justify-center"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+              >
+                {listeningMode === 'persistent' ? (
+                  <Mic className="h-3.5 w-3.5 text-black" />
+                ) : (
+                  <MicOff className="h-3.5 w-3.5 text-black" />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.button>
+
+        {/* Mode label */}
+        <AnimatePresence>
+          {listeningMode === 'persistent' && (
+            <motion.p
+              className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] text-[#00D4FF] whitespace-nowrap"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              Escuchando — doble tap para cerrar
+            </motion.p>
+          )}
+        </AnimatePresence>
       </motion.div>
 
-      {/* KIRA Orb */}
-      <KiraOrb />
+      {/* Hint text */}
+      <motion.p
+        className="text-[11px] text-muted-foreground/40 mb-8"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+      >
+        Toca para hablar con KIRA
+      </motion.p>
+
+      {/* Recent conversations */}
+      {conversations.length > 0 && (
+        <motion.div
+          className="w-full max-w-sm space-y-1.5"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.15em] font-medium">Recientes</p>
+            <button
+              onClick={() => router.push('/kira')}
+              className="text-[10px] text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors cursor-pointer"
+            >
+              Ver todo
+            </button>
+          </div>
+          {conversations.map((conv, i) => (
+            <motion.button
+              key={conv.id}
+              onClick={() => router.push(`/kira?conv=${conv.id}`)}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 + i * 0.08 }}
+              whileTap={{ scale: 0.97 }}
+              className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-colors cursor-pointer text-left"
+            >
+              <div className="h-8 w-8 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0">
+                <MessageSquare className="h-3.5 w-3.5 text-muted-foreground/60" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] text-foreground truncate">{conv.title}</p>
+              </div>
+              <span className="text-[10px] text-muted-foreground/40 shrink-0">{formatTimeAgo(conv.updated_at)}</span>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/20 shrink-0" />
+            </motion.button>
+          ))}
+        </motion.div>
+      )}
     </motion.div>
   )
 }

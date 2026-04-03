@@ -2,8 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2, X } from 'lucide-react'
+import {
+  Send, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2,
+  X, ArrowLeft, Bot, FolderOpen, ChevronRight
+} from 'lucide-react'
 import { KiraLogo } from '@/components/shared/KiraLogo'
+import { KiraAgents } from '@/components/kira/KiraAgents'
 import { cn } from '@/lib/utils'
 import { useTasks } from '@/lib/hooks/useTasks'
 import { useTaskStore } from '@/stores/taskStore'
@@ -28,10 +32,11 @@ const SUGGESTIONS = [
   '¿Qué tengo pendiente?',
   'Créame una task urgente',
   'Agenda una reunión',
-  '¿Mis prioridades?',
 ]
 
-export function KiraChat() {
+type ViewMode = 'chat' | 'conversations' | 'agents' | 'projects'
+
+export function KiraChat({ initialConversationId, initialTab }: { initialConversationId?: string | null; initialTab?: string | null }) {
   const { refetch: refetchTasks } = useTasks()
   const { refetch: refetchMeetings } = useMeetings()
 
@@ -46,8 +51,7 @@ export function KiraChat() {
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
-  const [showSidebar, setShowSidebar] = useState(false)
-  const [showMobileHistory, setShowMobileHistory] = useState(false)
+  const [view, setView] = useState<ViewMode>(initialTab === 'agents' ? 'agents' : 'chat')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -68,22 +72,22 @@ export function KiraChat() {
 
   useEffect(() => {
     const init = async () => {
-      try {
-        const res = await fetch('/api/ai/conversations')
-        if (!res.ok) return
-        const data = await res.json()
-        const convs = data.conversations || []
-        setConversations(convs)
-        if (convs.length > 0) {
-          await loadConversation(convs[0].id)
-        }
-      } catch { /* ignore */ }
+      await loadConversations()
+      const convs = await fetch('/api/ai/conversations').then(r => r.json()).then(d => d.conversations || []).catch(() => [])
+      setConversations(convs)
+
+      // Load specific conversation if provided
+      if (initialConversationId) {
+        await loadConversation(initialConversationId)
+      } else if (convs.length > 0 && initialTab !== 'agents') {
+        await loadConversation(convs[0].id)
+      }
     }
     init()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => { inputRef.current?.focus() }, [view])
 
   const loadConversation = async (convId: string) => {
     try {
@@ -97,16 +101,14 @@ export function KiraChat() {
       }))
       setMessages(loadedMessages)
       setConversationId(convId)
-      setShowSidebar(false)
-      setShowMobileHistory(false)
+      setView('chat')
     } catch { /* ignore */ }
   }
 
   const newConversation = () => {
     setMessages([])
     setConversationId(null)
-    setShowSidebar(false)
-    setShowMobileHistory(false)
+    setView('chat')
     inputRef.current?.focus()
   }
 
@@ -187,272 +189,286 @@ export function KiraChat() {
 
   const actionLabel = (action: string) => {
     const labels: Record<string, string> = {
-      create_task: 'Task creada', edit_task: 'Task actualizada', delete_task: 'Task eliminada',
-      create_meeting: 'Meeting creado', edit_meeting: 'Meeting actualizado', delete_meeting: 'Meeting cancelado',
+      create_task: 'Task creada', edit_task: 'Task editada', delete_task: 'Task eliminada',
+      create_meeting: 'Meeting creado', edit_meeting: 'Meeting editado', delete_meeting: 'Meeting cancelado',
       save_memory: 'Memoria guardada', delete_memory: 'Memoria eliminada',
-      create_calendar_event: 'Evento añadido a Google Calendar',
-      update_calendar_event: 'Evento de Google Calendar actualizado',
-      delete_calendar_event: 'Evento eliminado de Google Calendar',
+      create_calendar_event: 'Evento de calendario creado',
+      update_calendar_event: 'Evento actualizado',
+      delete_calendar_event: 'Evento eliminado',
       create_category: 'Categoría creada', create_project: 'Proyecto creado',
     }
     return labels[action] || action
   }
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const diff = Date.now() - date.getTime()
+    const diff = Date.now() - new Date(dateStr).getTime()
     const mins = Math.floor(diff / 60000)
-    if (mins < 60) return `hace ${mins}min`
+    if (mins < 60) return `${mins}m`
     const hours = Math.floor(mins / 60)
-    if (hours < 24) return `hace ${hours}h`
-    const days = Math.floor(hours / 24)
-    if (days < 7) return `hace ${days}d`
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+    if (hours < 24) return `${hours}h`
+    return `${Math.floor(hours / 24)}d`
   }
 
-  const ConversationList = () => (
-    <div className="overflow-y-auto flex-1">
-      {conversations.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground p-3">Sin conversaciones</p>
-      ) : (
-        conversations.map(conv => (
-          <div
-            key={conv.id}
-            onClick={() => loadConversation(conv.id)}
-            className={cn(
-              'group flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-white/5 transition-colors border-b border-white/[0.04]',
-              conversationId === conv.id && 'bg-white/[0.06]'
-            )}
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-foreground truncate">{conv.title}</p>
-              <p className="text-[10px] text-muted-foreground">{formatDate(conv.updated_at)}</p>
-            </div>
-            <button
-              onClick={(e) => deleteConversation(conv.id, e)}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 transition-all cursor-pointer"
-            >
-              <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-            </button>
+  // --- Conversations view ---
+  if (view === 'conversations') {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setView('chat')} className="text-muted-foreground hover:text-foreground cursor-pointer"><ArrowLeft className="h-5 w-5" /></button>
+            <h2 className="text-sm font-semibold text-foreground">Conversaciones</h2>
           </div>
-        ))
-      )}
-    </div>
-  )
-
-  return (
-    <div className="flex gap-0 md:gap-4 h-full">
-      {/* Desktop sidebar */}
-      <div className={cn(
-        'hidden md:flex shrink-0 flex-col glass-card overflow-hidden transition-all',
-        showSidebar ? 'w-64' : 'w-12'
-      )}>
-        <div className="p-2 border-b border-white/[0.06] flex items-center gap-2">
-          <button onClick={() => setShowSidebar(!showSidebar)} className="p-1.5 rounded-xl hover:bg-white/[0.06] transition-colors cursor-pointer" title="Conversaciones">
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </button>
-          {showSidebar && (
-            <>
-              <span className="text-xs font-medium text-muted-foreground flex-1">Historial</span>
-              <button onClick={newConversation} className="p-1.5 rounded-xl hover:bg-white/[0.06] transition-colors cursor-pointer" title="Nueva conversación">
-                <Plus className="h-4 w-4 text-[#00D4FF]" />
-              </button>
-            </>
-          )}
-        </div>
-        {showSidebar && <ConversationList />}
-        {!showSidebar && (
-          <div className="flex-1 flex flex-col items-center pt-2 gap-2">
-            <button onClick={newConversation} className="p-1.5 rounded-xl hover:bg-white/[0.06] transition-colors cursor-pointer" title="Nueva conversación">
-              <Plus className="h-4 w-4 text-[#00D4FF]" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Mobile history overlay */}
-      <AnimatePresence>
-        {showMobileHistory && (
-          <>
-            <motion.div
-              className="md:hidden fixed inset-0 z-[180] bg-black/60 backdrop-blur-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowMobileHistory(false)}
-            />
-            <motion.div
-              className="md:hidden fixed bottom-0 left-0 right-0 z-[181] max-h-[70vh] glass-elevated flex flex-col"
-              style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring' as const, stiffness: 300, damping: 30 }}
-            >
-              <div className="flex justify-center pt-2"><div className="w-8 h-1 rounded-full bg-white/10" /></div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-                <span className="text-sm font-medium">Conversaciones</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={newConversation} className="p-1.5 rounded-xl hover:bg-white/[0.06] cursor-pointer"><Plus className="h-4 w-4 text-[#00D4FF]" /></button>
-                  <button onClick={() => setShowMobileHistory(false)} className="p-1.5 rounded-xl hover:bg-white/[0.06] cursor-pointer"><X className="h-4 w-4 text-muted-foreground" /></button>
-                </div>
-              </div>
-              <ConversationList />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile action bar */}
-        <div className="flex md:hidden items-center gap-2 mb-3">
           <motion.button
-            onClick={() => setShowMobileHistory(true)}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-xs text-muted-foreground cursor-pointer backdrop-blur-sm"
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            Historial
-          </motion.button>
-          <motion.button
             onClick={newConversation}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-[rgba(0,212,255,0.06)] border border-[rgba(0,212,255,0.15)] text-xs text-[#00D4FF] cursor-pointer backdrop-blur-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00D4FF] text-black text-xs font-medium cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
             Nueva
           </motion.button>
         </div>
-
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-4 min-h-0 md:glass-card">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <motion.div
-                className="mb-4"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'spring' as const, stiffness: 200, damping: 20 }}
-              >
-                <KiraLogo size="lg" />
-              </motion.div>
-              <h2 className="text-sm font-semibold text-foreground mb-1">Hola, soy KIRA</h2>
-              <p className="text-xs text-muted-foreground mb-5 max-w-sm">
-                Puedo crear tasks, meetings, proyectos, categorías, gestionar tu Google Calendar y recordar cosas sobre ti.
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                {SUGGESTIONS.map((s, i) => (
-                  <motion.button
-                    key={i}
-                    onClick={() => sendMessage(s)}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.3 + i * 0.06 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="text-[11px] px-3.5 py-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:text-foreground hover:border-[#00D4FF]/30 hover:bg-white/[0.06] transition-all cursor-pointer backdrop-blur-sm"
-                  >
-                    {s}
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              {messages.map((msg, i) => (
-                <motion.div
-                  key={i}
-                  className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}
-                  initial={{ opacity: 0, y: 8, x: msg.role === 'user' ? 10 : -10 }}
-                  animate={{ opacity: 1, y: 0, x: 0 }}
-                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  <div
-                    className={cn(
-                      'max-w-[85%] md:max-w-[70%] text-[13px] leading-relaxed',
-                      msg.role === 'user'
-                        ? 'rounded-[20px] rounded-br-lg bg-[#00D4FF] text-black px-4 py-3'
-                        : 'rounded-[20px] rounded-bl-lg px-4 py-3 bg-white/[0.05] border border-white/[0.08] backdrop-blur-sm text-foreground'
-                    )}
-                  >
-                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
-                    {msg.actions && msg.actions.length > 0 && (
-                      <div className={cn(
-                        'mt-2.5 space-y-1.5 pt-2.5',
-                        msg.role === 'user' ? 'border-t border-black/10' : 'border-t border-white/[0.08]'
-                      )}>
-                        {msg.actions.map((act, j) => (
-                          <div key={j} className="flex items-center gap-1.5 text-[11px]">
-                            {act.success ? (
-                              <CheckCircle2 className={cn('h-3 w-3 shrink-0', msg.role === 'user' ? 'text-emerald-700' : 'text-emerald-400')} />
-                            ) : (
-                              <AlertCircle className="h-3 w-3 text-red-400 shrink-0" />
-                            )}
-                            <span className={cn(
-                              act.success
-                                ? (msg.role === 'user' ? 'opacity-80' : 'text-muted-foreground')
-                                : 'text-red-400'
-                            )}>
-                              {actionLabel(act.action)}
-                              {!act.success && act.error ? `: ${act.error}` : ''}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-              {loading && (
-                <motion.div
-                  className="flex justify-start"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <div className="rounded-[20px] rounded-bl-lg px-4 py-3 bg-white/[0.05] border border-white/[0.08] backdrop-blur-sm">
-                    <div className="flex items-center gap-2.5">
-                      <motion.div
-                        className="h-2 w-2 rounded-full bg-[#00D4FF]"
-                        animate={{ scale: [1, 1.3, 1], opacity: [1, 0.3, 1] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                      />
-                      <span className="text-xs text-muted-foreground">KIRA está pensando...</span>
-                    </div>
-                  </div>
-                </motion.div>
+        <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide">
+          {conversations.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-12">Sin conversaciones</p>
+          ) : conversations.map((conv) => (
+            <motion.div
+              key={conv.id}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => loadConversation(conv.id)}
+              className={cn(
+                'flex items-center gap-3 px-3.5 py-3 rounded-2xl cursor-pointer transition-colors group',
+                conversationId === conv.id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'
               )}
-              <div ref={messagesEndRef} />
-            </>
+            >
+              <div className="h-9 w-9 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0">
+                <MessageSquare className="h-4 w-4 text-muted-foreground/60" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] text-foreground truncate">{conv.title}</p>
+                <p className="text-[10px] text-muted-foreground">{formatDate(conv.updated_at)}</p>
+              </div>
+              <button
+                onClick={(e) => deleteConversation(conv.id, e)}
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-destructive/20 transition-all cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              </button>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/20" />
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // --- Agents view ---
+  if (view === 'agents') {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 mb-4">
+          <button onClick={() => setView('chat')} className="text-muted-foreground hover:text-foreground cursor-pointer"><ArrowLeft className="h-5 w-5" /></button>
+          <h2 className="text-sm font-semibold text-foreground">Agentes</h2>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <KiraAgents />
+        </div>
+      </div>
+    )
+  }
+
+  // --- Projects view ---
+  if (view === 'projects') {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 mb-4">
+          <button onClick={() => setView('chat')} className="text-muted-foreground hover:text-foreground cursor-pointer"><ArrowLeft className="h-5 w-5" /></button>
+          <h2 className="text-sm font-semibold text-foreground">Proyectos</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
+          {projects.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-12">Sin proyectos</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5">
+              {projects.map((project) => {
+                const projectTasks = tasks.filter(t => t.project_id === project.id && t.status !== 'deleted')
+                const done = projectTasks.filter(t => t.status === 'done').length
+                return (
+                  <motion.div
+                    key={project.id}
+                    whileTap={{ scale: 0.97 }}
+                    className="glass-card !rounded-2xl p-4 cursor-pointer"
+                    onClick={() => {
+                      // Start a conversation in project context
+                      setMessages([])
+                      setConversationId(null)
+                      setInput(`Hablemos sobre el proyecto "${project.name}"`)
+                      setView('chat')
+                    }}
+                  >
+                    <div className="h-10 w-10 rounded-xl bg-white/[0.06] flex items-center justify-center mb-3">
+                      <FolderOpen className="h-5 w-5 text-[#00D4FF]" />
+                    </div>
+                    <p className="text-[13px] font-semibold text-foreground truncate">{project.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {projectTasks.length} tasks · {done} done
+                    </p>
+                  </motion.div>
+                )
+              })}
+            </div>
           )}
         </div>
+      </div>
+    )
+  }
 
-        {/* Input area */}
-        <div className="mt-3 pb-[env(safe-area-inset-bottom)]">
-          <div className="relative glass-card !rounded-2xl overflow-hidden !p-0">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Escríbele a KIRA..."
-              rows={1}
-              className="w-full resize-none bg-transparent px-4 py-3.5 pr-12 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement
-                target.style.height = '48px'
-                target.style.height = Math.min(target.scrollHeight, 120) + 'px'
-              }}
-            />
-            <motion.button
-              onClick={() => sendMessage()}
-              disabled={!input.trim() || loading}
-              whileTap={{ scale: 0.9 }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-xl bg-[#00D4FF] text-black flex items-center justify-center disabled:opacity-20 cursor-pointer transition-opacity"
+  // --- Chat view (main) ---
+  return (
+    <div className="flex flex-col h-full">
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-3 overflow-x-auto scrollbar-hide">
+        {[
+          { id: 'conversations' as ViewMode, label: 'Conversaciones', icon: MessageSquare },
+          { id: 'projects' as ViewMode, label: 'Proyectos', icon: FolderOpen },
+          { id: 'agents' as ViewMode, label: 'Agentes', icon: Bot },
+        ].map((tab) => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setView(tab.id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors cursor-pointer shrink-0"
             >
-              <Send className="h-3.5 w-3.5" />
-            </motion.button>
+              <Icon className="h-3 w-3" />
+              {tab.label}
+            </button>
+          )
+        })}
+        <div className="flex-1" />
+        <button
+          onClick={newConversation}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium text-[#00D4FF] hover:bg-[rgba(0,212,255,0.06)] transition-colors cursor-pointer shrink-0"
+        >
+          <Plus className="h-3 w-3" />
+          Nueva
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto space-y-3 min-h-0 scrollbar-hide">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+            <motion.div
+              className="mb-4"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+            >
+              <KiraLogo size="lg" />
+            </motion.div>
+            <h2 className="text-sm font-semibold text-foreground mb-1">Hola, soy KIRA</h2>
+            <p className="text-xs text-muted-foreground mb-5 max-w-sm">
+              Puedo gestionar tasks, meetings, calendario, y recordar cosas sobre ti.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center max-w-sm">
+              {SUGGESTIONS.map((s, i) => (
+                <motion.button
+                  key={i}
+                  onClick={() => sendMessage(s)}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.3 + i * 0.06 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="text-[11px] px-3 py-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:text-foreground hover:border-[#00D4FF]/30 transition-all cursor-pointer"
+                >
+                  {s}
+                </motion.button>
+              ))}
+            </div>
           </div>
+        ) : (
+          <>
+            {messages.map((msg, i) => (
+              <motion.div
+                key={i}
+                className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <div
+                  className={cn(
+                    'max-w-[85%] md:max-w-[70%] text-[13px] leading-relaxed px-4 py-3',
+                    msg.role === 'user'
+                      ? 'rounded-[20px] rounded-br-md bg-[#00D4FF] text-black'
+                      : 'rounded-[20px] rounded-bl-md bg-white/[0.05] border border-white/[0.08] text-foreground'
+                  )}
+                >
+                  <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                  {msg.actions && msg.actions.length > 0 && (
+                    <div className={cn('mt-2 space-y-1 pt-2', msg.role === 'user' ? 'border-t border-black/10' : 'border-t border-white/[0.08]')}>
+                      {msg.actions.map((act, j) => (
+                        <div key={j} className="flex items-center gap-1.5 text-[11px]">
+                          {act.success ? (
+                            <CheckCircle2 className={cn('h-3 w-3 shrink-0', msg.role === 'user' ? 'text-emerald-700' : 'text-emerald-400')} />
+                          ) : (
+                            <AlertCircle className="h-3 w-3 text-red-400 shrink-0" />
+                          )}
+                          <span className={act.success ? (msg.role === 'user' ? 'opacity-80' : 'text-muted-foreground') : 'text-red-400'}>
+                            {actionLabel(act.action)}{!act.success && act.error ? `: ${act.error}` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+            {loading && (
+              <motion.div className="flex justify-start" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <div className="rounded-[20px] rounded-bl-md px-4 py-3 bg-white/[0.05] border border-white/[0.08]">
+                  <div className="flex items-center gap-2.5">
+                    <motion.div
+                      className="h-2 w-2 rounded-full bg-[#00D4FF]"
+                      animate={{ scale: [1, 1.3, 1], opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    />
+                    <span className="text-xs text-muted-foreground">Pensando...</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
+        )}
+      </div>
+
+      {/* Input */}
+      <div className="mt-3 pb-1">
+        <div className="relative rounded-2xl bg-white/[0.04] border border-white/[0.08] overflow-hidden">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Escríbele a KIRA..."
+            rows={1}
+            className="w-full resize-none bg-transparent px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+            style={{ minHeight: '44px', maxHeight: '120px' }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement
+              target.style.height = '44px'
+              target.style.height = Math.min(target.scrollHeight, 120) + 'px'
+            }}
+          />
+          <motion.button
+            onClick={() => sendMessage()}
+            disabled={!input.trim() || loading}
+            whileTap={{ scale: 0.9 }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-xl bg-[#00D4FF] text-black flex items-center justify-center disabled:opacity-20 cursor-pointer transition-opacity"
+          >
+            <Send className="h-3.5 w-3.5" />
+          </motion.button>
         </div>
       </div>
     </div>
