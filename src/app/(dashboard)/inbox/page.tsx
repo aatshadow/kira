@@ -66,13 +66,23 @@ export default function InboxPage() {
   const projects = useTaskStore((s) => s.projects)
   const tasks = useTaskStore((s) => s.tasks)
 
-  const [section, setSection] = useState<Section>('kira')
+  const [section, setSection] = useState<Section>('messages')
   const [search, setSearch] = useState('')
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [convsLoading, setConvsLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Sync inbox from all channels on mount
+  const syncInbox = useCallback(async () => {
+    setSyncing(true)
+    try {
+      await fetch('/api/inbox/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    } catch { /* ignore */ }
+    finally { setSyncing(false) }
+  }, [])
 
   // Load KIRA conversations
   useEffect(() => {
@@ -87,7 +97,9 @@ export default function InboxPage() {
       finally { setConvsLoading(false) }
     }
     load()
-  }, [])
+    // Also sync inbox on mount
+    syncInbox().then(() => fetchThreads())
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load inbox threads
   const fetchThreads = useCallback(async () => {
@@ -341,10 +353,18 @@ export default function InboxPage() {
                 </button>
               )
             })}
+            <button
+              onClick={async () => { await syncInbox(); await fetchThreads() }}
+              disabled={syncing}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium shrink-0 cursor-pointer transition-all text-[#00D4FF] hover:bg-[#00D4FF]/10 ml-auto"
+            >
+              {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              {syncing ? 'Sincronizando...' : 'Sync'}
+            </button>
           </div>
 
           <div className="space-y-1">
-            {loading ? (
+            {loading || syncing ? (
               <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
             ) : filteredThreads.length === 0 ? (
               <div className="text-center py-12">
@@ -352,7 +372,7 @@ export default function InboxPage() {
                   <InboxIcon className="h-6 w-6 text-muted-foreground/40" />
                 </div>
                 <p className="text-sm text-muted-foreground">Sin mensajes</p>
-                <p className="text-[11px] text-muted-foreground/60 mt-1">Conecta WhatsApp, Gmail o Instagram desde Agentes</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">Pulsa Sync para importar conversaciones de Gmail, WhatsApp, Instagram y LinkedIn</p>
               </div>
             ) : filteredThreads.map((thread) => {
               const Icon = CHANNEL_ICONS[thread.channel] || InboxIcon

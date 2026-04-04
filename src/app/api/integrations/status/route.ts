@@ -65,26 +65,45 @@ export async function GET() {
 
     // API key services
     brave_search: {
-      connected: !!keyMap.brave_search?.connected,
+      connected: !!process.env.BRAVE_API_KEY || !!keyMap.brave_search?.connected,
+      source: process.env.BRAVE_API_KEY ? 'env' : keyMap.brave_search?.connected ? 'user_key' : null,
       updated_at: keyMap.brave_search?.updated_at || null,
     },
     e2b: {
-      connected: !!keyMap.e2b?.connected,
+      connected: !!process.env.E2B_API_KEY || !!keyMap.e2b?.connected,
+      source: process.env.E2B_API_KEY ? 'env' : keyMap.e2b?.connected ? 'user_key' : null,
       updated_at: keyMap.e2b?.updated_at || null,
     },
     anthropic: {
       connected: !!process.env.ANTHROPIC_API_KEY || !!keyMap.anthropic?.connected,
+      source: process.env.ANTHROPIC_API_KEY ? 'env' : keyMap.anthropic?.connected ? 'user_key' : null,
       updated_at: keyMap.anthropic?.updated_at || null,
     },
 
     // Infrastructure
     mac_daemon: {
-      connected: macOnline,
+      connected: macOnline || !!process.env.MAC_DAEMON_SECRET,
+      daemon_online: macOnline,
+      configured: !!process.env.MAC_DAEMON_SECRET,
       capabilities: macOnline ? macSession?.capabilities : null,
     },
 
-    // Planned
-    whatsapp: { connected: false },
+    // WhatsApp (check SQLite DB exists)
+    whatsapp: await (async () => {
+      try {
+        const { checkWhatsAppStatus } = await import('@/lib/tools/whatsapp')
+        const status = await checkWhatsAppStatus()
+        return { connected: status.online, chatCount: status.chatCount, messageCount: status.messageCount }
+      } catch {
+        return { connected: false }
+      }
+    })(),
+    // ManyChat (Instagram/Facebook)
+    manychat: { connected: !!process.env.MANYCHAT_API_KEY },
+
+    // LinkedIn
+    linkedin: { connected: !!process.env.LINKEDIN_ACCESS_TOKEN },
+
     notion: { connected: false },
   })
 }

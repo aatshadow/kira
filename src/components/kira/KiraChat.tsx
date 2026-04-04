@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Send, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2,
-  X, ArrowLeft, Bot, FolderOpen, ChevronRight, Globe, Code, Brain, Monitor, Loader2
+  X, ArrowLeft, Bot, FolderOpen, ChevronRight, Globe, Code, Brain, Monitor, Loader2, Mail, Phone
 } from 'lucide-react'
 import { KiraLogo } from '@/components/shared/KiraLogo'
 import { KiraAgents } from '@/components/kira/KiraAgents'
@@ -44,6 +44,22 @@ const TOOL_META: Record<string, { icon: typeof Globe; label: string; color: stri
   query_knowledge: { icon: Brain, label: 'Buscando en memoria', color: '#F59E0B' },
   check_mac_status: { icon: Monitor, label: 'Verificando Mac', color: '#6366F1' },
   delegate_to_mac: { icon: Monitor, label: 'Delegando a Mac', color: '#6366F1' },
+  read_emails: { icon: Mail, label: 'Leyendo emails', color: '#EF4444' },
+  read_email_content: { icon: Mail, label: 'Leyendo email completo', color: '#EF4444' },
+  send_email: { icon: Mail, label: 'Enviando email', color: '#EF4444' },
+  whatsapp_send: { icon: Phone, label: 'Enviando WhatsApp', color: '#25D366' },
+  whatsapp_chats: { icon: Phone, label: 'Leyendo chats de WhatsApp', color: '#25D366' },
+  whatsapp_messages: { icon: Phone, label: 'Leyendo mensajes de WhatsApp', color: '#25D366' },
+  whatsapp_search_contacts: { icon: Phone, label: 'Buscando contactos WhatsApp', color: '#25D366' },
+  whatsapp_status: { icon: Phone, label: 'Verificando WhatsApp', color: '#25D366' },
+  manychat_search: { icon: MessageSquare, label: 'Buscando en ManyChat', color: '#E4405F' },
+  manychat_send: { icon: MessageSquare, label: 'Enviando via ManyChat', color: '#E4405F' },
+  manychat_subscriber_info: { icon: MessageSquare, label: 'Info suscriptor ManyChat', color: '#E4405F' },
+  manychat_status: { icon: MessageSquare, label: 'Verificando ManyChat', color: '#E4405F' },
+  linkedin_profile: { icon: Globe, label: 'Perfil LinkedIn', color: '#0A66C2' },
+  linkedin_post: { icon: Globe, label: 'Publicando en LinkedIn', color: '#0A66C2' },
+  linkedin_message: { icon: Globe, label: 'Enviando mensaje LinkedIn', color: '#0A66C2' },
+  linkedin_status: { icon: Globe, label: 'Verificando LinkedIn', color: '#0A66C2' },
 }
 
 type ViewMode = 'chat' | 'conversations' | 'agents' | 'projects'
@@ -334,6 +350,12 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
           ) : null}
           {tc.input && 'url' in tc.input && tc.input.url ? (
             <span className="text-muted-foreground ml-1 truncate block">{String(tc.input.url).slice(0, 80)}</span>
+          ) : null}
+          {tc.input && 'to' in tc.input && tc.input.to ? (
+            <span className="text-muted-foreground ml-1">— Para: {String(tc.input.to).slice(0, 60)}</span>
+          ) : null}
+          {tc.input && 'message_id' in tc.input ? (
+            <span className="text-muted-foreground ml-1">— ID: {String(tc.input.message_id).slice(0, 20)}...</span>
           ) : null}
           {!tc.loading && tc.result && (
             <p className="text-muted-foreground/70 mt-1 line-clamp-2">{tc.result.slice(0, 200)}</p>

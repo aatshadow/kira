@@ -155,6 +155,20 @@ async function verifyConnection(
         return { ok: false, message: `Último heartbeat hace ${minAgo} min`, details: `Mac ID: ${session.mac_id} — reinicia el daemon` }
       }
 
+      // --- WhatsApp (SQLite) ---
+      case 'whatsapp': {
+        try {
+          const { checkWhatsAppStatus } = await import('@/lib/tools/whatsapp')
+          const status = await checkWhatsAppStatus()
+          if (status.online) {
+            return { ok: true, message: 'WhatsApp conectado', details: `${status.chatCount} chats, ${status.messageCount} mensajes en DB` }
+          }
+          return { ok: false, message: 'DB no disponible', details: status.error || 'Ejecuta el bridge primero' }
+        } catch (e) {
+          return { ok: false, message: 'Error', details: e instanceof Error ? e.message : 'Unknown' }
+        }
+      }
+
       default:
         return { ok: false, message: 'Servicio no soportado para verificación' }
     }

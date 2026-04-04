@@ -3,16 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
+    "dev:all": "npx concurrently -n kira,whatsapp,daemon,jarvis -c cyan,green,magenta,yellow \"next dev -p 3001\" \"cd /Users/alex/whatsapp-mcp/whatsapp-bridge && ./whatsapp-bridge\" \"npx tsx scripts/kira-daemon.ts\" \"cd /Users/alex/Downloads/OpenJarvis-main && .venv/bin/jarvis serve -e cloud -m claude-haiku-4-5\"",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "daemon": "npx tsx scripts/kira-daemon.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@base-ui/react": "^1.3.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.99.1",
+    "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -36,6 +39,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

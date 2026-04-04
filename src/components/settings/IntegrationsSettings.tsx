@@ -17,8 +17,10 @@ interface IntegrationStatus {
   brave_search: { connected: boolean; updated_at: string | null }
   e2b: { connected: boolean; updated_at: string | null }
   anthropic: { connected: boolean; updated_at: string | null }
-  mac_daemon: { connected: boolean; capabilities: Record<string, boolean> | null }
+  mac_daemon: { connected: boolean; daemon_online?: boolean; configured?: boolean; capabilities: Record<string, boolean> | null }
   whatsapp: { connected: boolean }
+  manychat: { connected: boolean }
+  linkedin: { connected: boolean }
   notion: { connected: boolean }
 }
 
@@ -188,7 +190,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
       url: 'https://console.cloud.google.com/apis/library/gmail.googleapis.com',
       urlLabel: 'Habilitar Gmail API',
       pricing: 'Gratis.',
-      notes: 'Solo lectura — KIRA no envía ni modifica emails. Los cron jobs revisan cada 15 min.',
+      notes: 'KIRA puede leer y enviar emails. Los cron jobs revisan cada 15 min para emails urgentes.',
     },
   },
   // --- Infrastructure ---
@@ -219,21 +221,70 @@ const INTEGRATIONS: IntegrationConfig[] = [
       notes: 'El daemon envía heartbeat cada 30s. Cuando cierras la terminal, las tareas se encolan hasta que vuelvas a conectarte.',
     },
   },
-  // --- Planned ---
+  // --- Communications ---
   {
     id: 'whatsapp',
     name: 'WhatsApp',
-    desc: 'Mensajes, seguimiento de conversaciones y notificaciones.',
+    desc: 'Leer y enviar mensajes de WhatsApp, buscar contactos, ver chats recientes.',
     icon: MessageCircle,
     color: '#25D366',
     category: 'comms',
+    autoExpandWhenDisconnected: true,
     setupGuide: {
       steps: [
-        'Próximamente — integración via WhatsApp Business API o MCP bridge',
+        'WhatsApp funciona via un bridge local (whatsapp-mcp)',
+        'Asegúrate de que el bridge está corriendo:',
       ],
+      terminalCommand: 'cd /Users/alex/whatsapp-mcp/whatsapp-bridge && go run main.go',
       url: '',
       urlLabel: '',
-      notes: 'Ya hay un MCP de WhatsApp conectado a KIRA. La integración directa está en desarrollo.',
+      pricing: 'Gratis — corre en tu Mac.',
+      notes: 'El bridge conecta con tu WhatsApp Web. KIRA puede leer chats, enviar mensajes y buscar contactos. Necesitas escanear el QR la primera vez.',
+    },
+  },
+  {
+    id: 'manychat',
+    name: 'ManyChat (Instagram/Facebook)',
+    desc: 'Envía y recibe DMs de Instagram y Facebook via ManyChat. Busca suscriptores, gestiona flows.',
+    icon: MessageCircle,
+    color: '#E4405F',
+    category: 'comms',
+    requiresKey: true,
+    keyService: 'manychat',
+    keyPlaceholder: '1234567:abc...',
+    setupGuide: {
+      steps: [
+        'Ve a ManyChat → Settings → API',
+        'Copia tu API Key',
+        'Pégala en el input de abajo o en .env.local como MANYCHAT_API_KEY',
+      ],
+      url: 'https://manychat.com/settings',
+      urlLabel: 'Abrir ManyChat Settings',
+      pricing: 'Free: 1,000 contactos. Pro: $15/mes.',
+      notes: 'KIRA puede buscar suscriptores, enviar mensajes y consultar info de contactos via ManyChat.',
+    },
+  },
+  {
+    id: 'linkedin',
+    name: 'LinkedIn',
+    desc: 'Publica posts, consulta perfil. Mensajería limitada por API de LinkedIn.',
+    icon: Globe,
+    color: '#0A66C2',
+    category: 'comms',
+    requiresKey: true,
+    keyService: 'linkedin',
+    keyPlaceholder: 'AQXhg...',
+    setupGuide: {
+      steps: [
+        'Ve a LinkedIn Developers → Create App',
+        'Solicita acceso a los productos: Share on LinkedIn, Sign In with LinkedIn',
+        'Genera un Access Token en Auth → OAuth 2.0 tools',
+        'Pégalo en el input de abajo o en .env.local como LINKEDIN_ACCESS_TOKEN',
+      ],
+      url: 'https://www.linkedin.com/developers/apps',
+      urlLabel: 'LinkedIn Developer Portal',
+      pricing: 'Gratis — la API de mensajería requiere aprobación especial.',
+      notes: 'KIRA puede publicar posts y consultar tu perfil. Los DMs requieren permisos adicionales de LinkedIn.',
     },
   },
   {
@@ -589,7 +640,7 @@ export function IntegrationsSettings() {
                         {/* Mac Daemon status */}
                         {int.id === 'mac_daemon' && status?.mac_daemon && (
                           <div className="mt-3">
-                            {status.mac_daemon.connected ? (
+                            {status.mac_daemon.daemon_online ? (
                               <div className="flex items-center gap-2 text-[11px] text-emerald-400">
                                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                                 Mac online
@@ -599,10 +650,15 @@ export function IntegrationsSettings() {
                                   </span>
                                 )}
                               </div>
+                            ) : status.mac_daemon.configured ? (
+                              <div className="flex items-center gap-2 text-[11px] text-amber-400/80">
+                                <span className="h-2 w-2 rounded-full bg-amber-400/60" />
+                                Configurado — daemon offline. Las tareas se encolarán
+                              </div>
                             ) : (
                               <div className="flex items-center gap-2 text-[11px] text-muted-foreground/60">
                                 <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
-                                Mac offline — las tareas se encolarán
+                                No configurado
                               </div>
                             )}
                           </div>
