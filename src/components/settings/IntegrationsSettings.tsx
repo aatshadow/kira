@@ -40,12 +40,14 @@ interface IntegrationConfig {
   requiresKey?: boolean
   keyService?: string
   keyPlaceholder?: string
+  autoExpandWhenDisconnected?: boolean
   setupGuide: {
     steps: string[]
     url: string
     urlLabel: string
     notes?: string
     pricing?: string
+    terminalCommand?: string
   }
 }
 
@@ -192,7 +194,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
   // --- Infrastructure ---
   {
     id: 'mac_daemon',
-    name: 'Mac Daemon',
+    name: 'Mac Daemon (Terminal)',
     desc: 'Tu Mac ejecuta tareas pesadas (scraping, código largo, modelos locales). KIRA detecta cuando está online.',
     icon: Monitor,
     color: '#6366F1',
@@ -200,20 +202,21 @@ const INTEGRATIONS: IntegrationConfig[] = [
     requiresKey: true,
     keyService: 'mac_daemon',
     keyPlaceholder: 'kira-mac-secret-...',
+    autoExpandWhenDisconnected: true,
     setupGuide: {
       steps: [
-        'Genera un secret aleatorio (o usa el que ya está en .env.local)',
-        'Pega el mismo secret aquí y en tu .env.local como MAC_DAEMON_SECRET',
-        'También necesitas tu KIRA_USER_ID en .env.local (es tu UUID de Supabase)',
-        'Para ejecutar el daemon en tu Mac:',
-        '  cd /Users/alex/KIRA/kira',
-        '  npx tsx scripts/kira-daemon.ts',
-        'El daemon enviará heartbeat cada 30s y ejecutará tareas automáticamente',
+        'Añade estas variables a tu .env.local:',
+        '  MAC_DAEMON_SECRET=kira-mac-secret-cambiame',
+        '  KIRA_USER_ID=tu-uuid-de-supabase',
+        'El secret de arriba debe coincidir con el que pongas en el input de esta página',
+        'Tu KIRA_USER_ID lo encuentras en Supabase → Authentication → Users',
+        'Abre una terminal y ejecuta el daemon:',
       ],
+      terminalCommand: 'cd /Users/alex/KIRA/kira && npx tsx scripts/kira-daemon.ts',
       url: '',
       urlLabel: '',
       pricing: 'Gratis — corre en tu Mac.',
-      notes: 'Cuando cierras la terminal, las tareas se encolan hasta que vuelvas a conectarte.',
+      notes: 'El daemon envía heartbeat cada 30s. Cuando cierras la terminal, las tareas se encolan hasta que vuelvas a conectarte.',
     },
   },
   // --- Planned ---
@@ -275,6 +278,8 @@ export function IntegrationsSettings() {
   const [keyVisible, setKeyVisible] = useState<Record<string, boolean>>({})
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [keyMessages, setKeyMessages] = useState<Record<string, { ok: boolean; text: string }>>({})
+  const [verifying, setVerifying] = useState<string | null>(null)
+  const [verifyResults, setVerifyResults] = useState<Record<string, { ok: boolean; message: string; details?: string }>>({})
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -351,6 +356,25 @@ export function IntegrationsSettings() {
       setKeyMessages(prev => ({ ...prev, [service]: { ok: true, text: 'Key eliminada' } }))
       fetchStatus()
     } catch { /* ignore */ }
+  }
+
+  const verifyConnection = async (service: string) => {
+    setVerifying(service)
+    setVerifyResults(prev => ({ ...prev, [service]: undefined as unknown as { ok: boolean; message: string; details?: string } }))
+    try {
+      const res = await fetch('/api/integrations/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service }),
+      })
+      const data = await res.json()
+      setVerifyResults(prev => ({ ...prev, [service]: data }))
+      fetchStatus()
+    } catch {
+      setVerifyResults(prev => ({ ...prev, [service]: { ok: false, message: 'Error de red' } }))
+    } finally {
+      setVerifying(null)
+    }
   }
 
   const isConnected = (id: string): boolean => {
@@ -443,7 +467,7 @@ export function IntegrationsSettings() {
             {items.map(int => {
               const Icon = int.icon
               const connected = isConnected(int.id)
-              const isExpanded = expandedGuide === int.id
+              const isExpanded = expandedGuide === int.id || (int.autoExpandWhenDisconnected && !connected)
               const savedKey = savedKeys.find(k => k.service === int.keyService)
               const keyMsg = int.keyService ? keyMessages[int.keyService] : null
 
@@ -584,15 +608,57 @@ export function IntegrationsSettings() {
                           </div>
                         )}
 
-                        {/* Setup guide toggle */}
-                        <button
-                          onClick={() => setExpandedGuide(isExpanded ? null : int.id)}
-                          className="mt-3 flex items-center gap-1.5 text-[11px] text-[#00D4FF]/70 hover:text-[#00D4FF] cursor-pointer transition-colors"
-                        >
-                          <Shield className="h-3 w-3" />
-                          {connected ? 'Ver guía de configuración' : 'Cómo conectar'}
-                          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </button>
+                        {/* Verify connection button — always visible */}
+                        <div className="mt-3 flex items-center gap-2 flex-wrap">
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => verifyConnection(int.id)}
+                            disabled={verifying === int.id}
+                            className={cn(
+                              'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium cursor-pointer transition-all',
+                              connected
+                                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/15'
+                                : 'bg-white/[0.04] border border-white/[0.08] text-foreground hover:bg-white/[0.08]'
+                            )}
+                          >
+                            {verifying === int.id ? (
+                              <><Loader2 className="h-3 w-3 animate-spin" /> Verificando...</>
+                            ) : (
+                              <><RefreshCw className="h-3 w-3" /> Verificar conexión</>
+                            )}
+                          </motion.button>
+
+                          <button
+                            onClick={() => setExpandedGuide(isExpanded ? null : int.id)}
+                            className="flex items-center gap-1.5 text-[11px] text-[#00D4FF]/70 hover:text-[#00D4FF] cursor-pointer transition-colors"
+                          >
+                            <Shield className="h-3 w-3" />
+                            {connected ? 'Guía' : 'Cómo conectar'}
+                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </button>
+                        </div>
+
+                        {/* Verify result */}
+                        {verifyResults[int.id] && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={cn(
+                              'mt-2 px-3 py-2 rounded-xl text-[11px] border',
+                              verifyResults[int.id].ok
+                                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+                                : 'bg-red-500/5 border-red-500/20 text-red-400'
+                            )}
+                          >
+                            <div className="flex items-center gap-1.5 font-medium">
+                              {verifyResults[int.id].ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                              {verifyResults[int.id].message}
+                            </div>
+                            {verifyResults[int.id].details && (
+                              <p className="mt-0.5 text-[10px] opacity-70">{verifyResults[int.id].details}</p>
+                            )}
+                          </motion.div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -628,6 +694,23 @@ export function IntegrationsSettings() {
                                 </li>
                               ))}
                             </ol>
+
+                            {/* Terminal command block */}
+                            {int.setupGuide.terminalCommand && (
+                              <div className="relative group">
+                                <div className="font-mono text-[11px] bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-emerald-400">
+                                  <span className="text-muted-foreground/50 select-none">$ </span>
+                                  {int.setupGuide.terminalCommand}
+                                </div>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(int.setupGuide.terminalCommand!)}
+                                  className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                  title="Copiar comando"
+                                >
+                                  <Copy className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                              </div>
+                            )}
 
                             {/* Link */}
                             {int.setupGuide.url && (
