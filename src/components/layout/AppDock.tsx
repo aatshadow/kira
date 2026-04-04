@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Home, Inbox, Bot, Settings, FolderKanban, Cpu } from 'lucide-react'
+import { Home, Inbox, Bot, Settings, FolderKanban } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const apps = [
@@ -10,7 +10,7 @@ const apps = [
   { href: '/inbox', icon: Inbox, label: 'Inbox', color: '#8B5CF6' },
   { href: '/', icon: Home, label: 'Home', color: '#FFFFFF' },
   { href: '/kira', icon: Bot, label: 'KIRA', color: '#00D4FF' },
-  { href: '/jarvis', icon: Cpu, label: 'Jarvis', color: '#10B981' },
+  { href: '/settings', icon: Settings, label: 'Settings', color: '#888' },
 ]
 
 export function AppDock() {

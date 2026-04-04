@@ -1,0 +1,8 @@
+{
+  "crons": [
+    { "path": "/api/cron/daily-digest", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/calendar-sync", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/email-check", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/profile-update", "schedule": "0 3 * * 0" }
+  ]
+}

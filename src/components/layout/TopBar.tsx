@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Clock, User, Home, FolderKanban, Bot, BarChart3, Settings, Inbox, Cpu } from 'lucide-react'
+import { Clock, User, Home, FolderKanban, Bot, BarChart3, Settings, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTimerStore } from '@/stores/timerStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -17,7 +17,6 @@ const navLinks = [
   { href: '/management', label: 'Management', icon: FolderKanban },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
   { href: '/kira', label: 'KIRA', icon: Bot },
-  { href: '/jarvis', label: 'Jarvis', icon: Cpu },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]

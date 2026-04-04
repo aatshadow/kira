@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { getValidGoogleToken } from '@/lib/google'
+import { executeTool, KIRA_TOOLS } from '@/lib/tools'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -10,11 +11,16 @@ interface ChatMessage {
   content: string
 }
 
+// SSE helper
+function sseEncode(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
 
   const { messages, context, conversationId } = await request.json() as {
@@ -31,13 +37,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    return NextResponse.json({ error: 'Messages required' }, { status: 400 })
+    return new Response(JSON.stringify({ error: 'Messages required' }), { status: 400 })
   }
 
   // --- Conversation persistence ---
   let convId = conversationId
 
-  // Create new conversation if needed
   if (!convId) {
     const firstMsg = messages[0]?.content || ''
     const title = firstMsg.slice(0, 80) || 'Nueva conversación'
@@ -49,7 +54,6 @@ export async function POST(request: NextRequest) {
     convId = conv?.id || null
   }
 
-  // Save the user message (last one in array)
   const lastUserMsg = messages[messages.length - 1]
   if (convId && lastUserMsg?.role === 'user') {
     await supabase.from('chat_messages').insert({
@@ -99,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // --- Load KIRA memories (recent + important, never lost) ---
+  // --- Load KIRA memories ---
   const [recentMemoriesRes, totalMemoriesRes] = await Promise.all([
     supabase
       .from('kira_memory')
@@ -121,7 +125,7 @@ export async function POST(request: NextRequest) {
     : '(no memories yet)'
 
   if (totalMemories > 80) {
-    memoryText += `\n\n(Mostrando 80 memorias mas recientes de ${totalMemories} totales. El perfil AI contiene el analisis consolidado de todas.)`
+    memoryText += `\n\n(Mostrando 80 memorias mas recientes de ${totalMemories} totales.)`
   }
 
   // --- Load AI-generated user profile ---
@@ -200,7 +204,19 @@ ${calendarEventsText}
 
 ## Your Capabilities
 
-You can execute actions by including JSON action blocks in your response:
+### Tools (automatic — you call them, results come back, you continue)
+You have tools available that you can call automatically:
+- **web_search**: Search the internet for current info (news, weather, prices, etc.)
+- **get_url_content**: Read the content of any URL
+- **execute_code**: Run Python or JavaScript code in a sandbox
+- **query_knowledge**: Search your memories and past conversations for context
+- **check_mac_status**: Check if the user's Mac is online for heavy tasks
+- **delegate_to_mac**: Send long-running tasks (scraping, heavy processing) to the user's Mac
+
+Use tools proactively when they would help answer the user's question. Don't ask permission — just use them.
+
+### Actions (embedded in your text response for data mutations)
+You can also execute actions by including JSON action blocks in your response:
 
 \`\`\`kira-action
 {
@@ -272,413 +288,476 @@ You can execute actions by including JSON action blocks in your response:
 7. You can answer questions about the user's tasks, schedule, productivity, etc.
 8. Be proactive — if the user says something vague, suggest the best interpretation.
 9. Keep responses concise but warm. You're a personal assistant, not a robot.
-10. When the user tells you personal preferences, habits, goals, mentions people, expresses emotions, or reveals anything about who they are, use the save_memory action PROACTIVELY. Don't wait for them to say "recuerda esto" — if it's worth remembering, save it. Your memory is permanent and grows with every conversation.
-11. When the user greets you (buenos días, hola, etc.), give a brief, warm greeting with a quick summary of their day: pending tasks for today, upcoming meetings, and any urgent items. Use your memory to personalize.
-12. You can reference your memories naturally in conversation — "como me dijiste..." or "recuerdo que prefieres..."
+10. When the user tells you personal preferences, habits, goals, mentions people, expresses emotions, or reveals anything about who they are, use the save_memory action PROACTIVELY. Don't wait for them to say "recuerda esto" — if it's worth remembering, save it.
+11. When the user greets you (buenos días, hola, etc.), give a brief, warm greeting with a quick summary of their day.
+12. You can reference your memories naturally in conversation.
 13. Never show raw IDs to the user. Use names instead.
-14. For Google Calendar: you can create, update, and delete events. You can add/remove attendees, add Google Meet video calls, change times, descriptions, and locations. Use the gcal_id shown in the calendar events list to reference existing events.
+14. For Google Calendar: you can create, update, and delete events.
 15. When the user asks to add a Meet link or video call to an event, use add_meet: true.
-16. When analyzing the calendar, provide insights about schedule density, conflicts, free slots, and meeting patterns.
-17. When the user mentions a category or project that doesn't exist yet, create it first with create_category or create_project, then use the returned ID for the task.`
+16. When analyzing the calendar, provide insights about schedule density, conflicts, free slots.
+17. When the user mentions a category or project that doesn't exist yet, create it first.
+18. Use your tools proactively — if someone asks about the weather, search for it. If they share a link, read it. If they need a calculation, run code.`
 
-  try {
-    const anthropicMessages = messages.map((m: ChatMessage) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    }))
-
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      system: systemPrompt,
-      messages: anthropicMessages,
-    })
-
-    const content = response.content[0]
-    if (content.type !== 'text') {
-      return NextResponse.json({ error: 'Unexpected response' }, { status: 500 })
-    }
-
-    // Extract actions from response
-    // Claude may output { action, data: {...} } or flat { action, ...fields }
-    const actions: Array<{ action: string; data: Record<string, unknown> }> = []
-    const actionRegex = /```kira-action\n([\s\S]*?)```/g
-    let match
-    while ((match = actionRegex.exec(content.text)) !== null) {
+  // --- Stream response with tool loop ---
+  const stream = new ReadableStream({
+    async start(controller) {
       try {
-        const parsed = JSON.parse(match[1])
-        const { action, data, ...rest } = parsed
-        // Normalize: if no data wrapper, treat remaining fields as data
-        actions.push({ action, data: data || rest })
-      } catch {
-        // skip malformed actions
-      }
-    }
+        // Convert messages for Anthropic API
+        const anthropicMessages: Anthropic.MessageParam[] = messages.map((m: ChatMessage) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }))
 
-    // Execute actions
-    const actionResults: Array<{ action: string; success: boolean; id?: string; error?: string }> = []
+        let fullText = ''
+        const toolCalls: Array<{ id: string; name: string; input: Record<string, unknown>; result?: string }> = []
+        let iterations = 0
+        const MAX_ITERATIONS = 5
 
-    for (const act of actions) {
-      try {
-        switch (act.action) {
-          case 'create_task': {
-            const { data: task, error } = await supabase
-              .from('tasks')
-              .insert({ ...act.data, user_id: user.id })
-              .select()
-              .single()
-            actionResults.push({ action: 'create_task', success: !error, id: task?.id, error: error?.message })
-            break
-          }
-          case 'edit_task': {
-            const { id, ...updates } = act.data as { id: string; [key: string]: unknown }
-            const { error } = await supabase.from('tasks').update(updates).eq('id', id)
-            actionResults.push({ action: 'edit_task', success: !error, id, error: error?.message })
-            break
-          }
-          case 'delete_task': {
-            const { id } = act.data as { id: string }
-            const { error } = await supabase.from('tasks').update({ status: 'deleted' }).eq('id', id)
-            actionResults.push({ action: 'delete_task', success: !error, id, error: error?.message })
-            break
-          }
-          case 'create_meeting': {
-            const md = act.data as Record<string, unknown>
-            const meetingData = {
-              title: md.title || md.summary || 'Sin título',
-              scheduled_at: md.scheduled_at || null,
-              duration_mins: md.duration_mins || null,
-              participants: md.participants || null,
-              pre_notes: md.pre_notes || null,
-              user_id: user.id,
-              status: 'scheduled',
-            }
-            const { data: meeting, error } = await supabase
-              .from('meetings')
-              .insert(meetingData)
-              .select()
-              .single()
-            actionResults.push({ action: 'create_meeting', success: !error, id: meeting?.id, error: error?.message })
-            break
-          }
-          case 'edit_meeting': {
-            const { id, ...updates } = act.data as { id: string; [key: string]: unknown }
-            const { error } = await supabase.from('meetings').update(updates).eq('id', id)
-            actionResults.push({ action: 'edit_meeting', success: !error, id, error: error?.message })
-            break
-          }
-          case 'delete_meeting': {
-            const { id } = act.data as { id: string }
-            const { error } = await supabase.from('meetings').update({ status: 'cancelled' }).eq('id', id)
-            actionResults.push({ action: 'delete_meeting', success: !error, id, error: error?.message })
-            break
-          }
-          case 'save_memory': {
-            const { category, content: memContent } = act.data as { category: string; content: string }
-            const { error } = await supabase.from('kira_memory').insert({
-              user_id: user.id,
-              category: category || 'general',
-              content: memContent,
-              source_conversation_id: convId,
-            })
-            actionResults.push({ action: 'save_memory', success: !error, error: error?.message })
-            break
-          }
-          case 'create_calendar_event': {
-            if (!googleToken) {
-              actionResults.push({ action: 'create_calendar_event', success: false, error: 'Google Calendar no conectado' })
-              break
-            }
-            const calData = act.data as Record<string, unknown> || {}
-            const evTitle = (calData.title || calData.summary || 'Sin título') as string
-            const evStart = (calData.start || calData.dateTime || calData.start_time) as string
-            const evEnd = (calData.end || calData.end_time) as string | undefined
-            const evDesc = (calData.description || calData.notes) as string | undefined
-            const evAttendees = (calData.attendees) as string | undefined
-            if (!evStart) {
-              actionResults.push({ action: 'create_calendar_event', success: false, error: 'Missing start time' })
-              break
-            }
-            const evLocation = (calData.location) as string | undefined
-            const evAddMeet = calData.add_meet as boolean | undefined
-            const calEvent: Record<string, unknown> = {
-              summary: evTitle,
-              start: { dateTime: evStart, timeZone: 'Europe/Madrid' },
-              end: { dateTime: evEnd || new Date(new Date(evStart).getTime() + 60 * 60 * 1000).toISOString(), timeZone: 'Europe/Madrid' },
-            }
-            if (evDesc) calEvent.description = evDesc
-            if (evLocation) calEvent.location = evLocation
-            if (evAttendees) {
-              calEvent.attendees = evAttendees.split(',').map((email: string) => ({ email: email.trim() }))
-            }
-            if (evAddMeet) {
-              calEvent.conferenceData = {
-                createRequest: { requestId: `kira-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } },
-              }
-            }
-            try {
-              const calUrl = 'https://www.googleapis.com/calendar/v3/calendars/primary/events' + (evAddMeet ? '?conferenceDataVersion=1' : '')
-              const calRes = await fetch(calUrl, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(calEvent),
-              })
-              const calResult = await calRes.json()
-              actionResults.push({
-                action: 'create_calendar_event',
-                success: calRes.ok,
-                id: calResult.id,
-                error: calRes.ok ? undefined : calResult.error?.message,
-              })
-            } catch (calErr) {
-              actionResults.push({ action: 'create_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
-            }
-            break
-          }
-          case 'update_calendar_event': {
-            if (!googleToken) {
-              actionResults.push({ action: 'update_calendar_event', success: false, error: 'Google Calendar no conectado' })
-              break
-            }
-            const upData = act.data as Record<string, unknown> || {}
-            const eventId = upData.event_id as string
-            if (!eventId) {
-              actionResults.push({ action: 'update_calendar_event', success: false, error: 'Missing event_id' })
-              break
-            }
-            try {
-              // First GET the existing event
-              const getRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
-                headers: { Authorization: `Bearer ${googleToken}` },
-              })
-              if (!getRes.ok) {
-                const getErr = await getRes.json()
-                actionResults.push({ action: 'update_calendar_event', success: false, error: getErr.error?.message || 'Event not found' })
-                break
-              }
-              const existing = await getRes.json()
+        // Agentic loop: call Claude, execute tools, repeat
+        while (iterations < MAX_ITERATIONS) {
+          iterations++
 
-              // Build patch
-              if (upData.title) existing.summary = upData.title
-              if (upData.start) existing.start = { dateTime: upData.start, timeZone: 'Europe/Madrid' }
-              if (upData.end) existing.end = { dateTime: upData.end, timeZone: 'Europe/Madrid' }
-              if (upData.description !== undefined) existing.description = upData.description || ''
-              if (upData.location !== undefined) existing.location = upData.location || ''
+          const response = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: anthropicMessages,
+            tools: KIRA_TOOLS as unknown as Anthropic.Tool[],
+          })
 
-              // Handle attendees
-              const currentAttendees: Array<{ email: string; responseStatus?: string }> = existing.attendees || []
-              if (upData.add_attendees) {
-                const toAdd = (upData.add_attendees as string).split(',').map(e => e.trim()).filter(Boolean)
-                for (const email of toAdd) {
-                  if (!currentAttendees.some(a => a.email === email)) {
-                    currentAttendees.push({ email })
-                  }
-                }
-                existing.attendees = currentAttendees
-              }
-              if (upData.remove_attendees) {
-                const toRemove = (upData.remove_attendees as string).split(',').map(e => e.trim().toLowerCase())
-                existing.attendees = currentAttendees.filter(a => !toRemove.includes(a.email.toLowerCase()))
-              }
+          let hasToolUse = false
 
-              // Add Meet link
-              const wantMeet = upData.add_meet as boolean
-              let confVersion = ''
-              if (wantMeet && !existing.hangoutLink) {
-                existing.conferenceData = {
-                  createRequest: { requestId: `kira-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } },
-                }
-                confVersion = '?conferenceDataVersion=1'
-              }
+          for (const block of response.content) {
+            if (block.type === 'text') {
+              fullText += block.text
+              controller.enqueue(new TextEncoder().encode(
+                sseEncode('text', { text: block.text })
+              ))
+            } else if (block.type === 'tool_use') {
+              hasToolUse = true
 
-              const separator = confVersion ? '&' : '?'
-              const patchRes = await fetch(
-                `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}${confVersion}${separator}sendUpdates=all`,
-                {
-                  method: 'PUT',
-                  headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify(existing),
-                }
-              )
-              const patchResult = await patchRes.json()
-              actionResults.push({
-                action: 'update_calendar_event',
-                success: patchRes.ok,
-                id: eventId,
-                error: patchRes.ok ? undefined : patchResult.error?.message,
+              // Notify UI about tool call start
+              controller.enqueue(new TextEncoder().encode(
+                sseEncode('tool_start', { id: block.id, name: block.name, input: block.input })
+              ))
+
+              // Execute the tool
+              const result = await executeTool(block.name, block.input as Record<string, unknown>, user.id)
+
+              toolCalls.push({
+                id: block.id,
+                name: block.name,
+                input: block.input as Record<string, unknown>,
+                result: result.content,
               })
-            } catch (calErr) {
-              actionResults.push({ action: 'update_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
-            }
-            break
-          }
-          case 'delete_calendar_event': {
-            if (!googleToken) {
-              actionResults.push({ action: 'delete_calendar_event', success: false, error: 'Google Calendar no conectado' })
-              break
-            }
-            const delData = act.data as Record<string, unknown> || {}
-            const delEventId = delData.event_id as string
-            if (!delEventId) {
-              actionResults.push({ action: 'delete_calendar_event', success: false, error: 'Missing event_id' })
-              break
-            }
-            try {
-              const sendNotif = delData.send_notifications !== false ? 'all' : 'none'
-              const delRes = await fetch(
-                `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(delEventId)}?sendUpdates=${sendNotif}`,
-                {
-                  method: 'DELETE',
-                  headers: { Authorization: `Bearer ${googleToken}` },
-                }
-              )
-              // DELETE returns 204 No Content on success
-              actionResults.push({
-                action: 'delete_calendar_event',
-                success: delRes.status === 204 || delRes.ok,
-                id: delEventId,
-                error: delRes.ok || delRes.status === 204 ? undefined : 'Failed to delete event',
+
+              // Notify UI about tool result
+              controller.enqueue(new TextEncoder().encode(
+                sseEncode('tool_result', {
+                  id: block.id,
+                  name: block.name,
+                  result: result.content.slice(0, 500),
+                  error: result.error,
+                })
+              ))
+
+              // Add assistant message with tool_use + tool_result for next iteration
+              anthropicMessages.push({
+                role: 'assistant',
+                content: response.content as Anthropic.ContentBlock[],
               })
-            } catch (calErr) {
-              actionResults.push({ action: 'delete_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
-            }
-            break
-          }
-          case 'create_category': {
-            const { name } = act.data as { name: string }
-            if (!name) {
-              actionResults.push({ action: 'create_category', success: false, error: 'Missing name' })
-              break
-            }
-            const { data: cat, error } = await supabase
-              .from('categories')
-              .insert({ user_id: user.id, name })
-              .select()
-              .single()
-            actionResults.push({ action: 'create_category', success: !error, id: cat?.id, error: error?.message })
-            break
-          }
-          case 'create_project': {
-            const projData = act.data as { name: string; description?: string }
-            if (!projData.name) {
-              actionResults.push({ action: 'create_project', success: false, error: 'Missing name' })
-              break
-            }
-            const { data: proj, error } = await supabase
-              .from('projects')
-              .insert({ user_id: user.id, name: projData.name, description: projData.description || null })
-              .select()
-              .single()
-            actionResults.push({ action: 'create_project', success: !error, id: proj?.id, error: error?.message })
-            break
-          }
-          case 'delete_memory': {
-            const { content_match } = act.data as { content_match: string }
-            const { error } = await supabase
-              .from('kira_memory')
-              .delete()
-              .eq('user_id', user.id)
-              .ilike('content', `%${content_match}%`)
-            actionResults.push({ action: 'delete_memory', success: !error, error: error?.message })
-            break
-          }
-          case 'sync_calendar': {
-            try {
-              const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
-              const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
-              const syncRes = await fetch(`${baseUrl}/api/calendar/sync`, {
-                method: 'POST',
-                headers: { cookie: request.headers.get('cookie') || '' },
+              anthropicMessages.push({
+                role: 'user',
+                content: [{
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: result.content,
+                }],
               })
-              const syncData = await syncRes.json()
-              actionResults.push({
-                action: 'sync_calendar',
-                success: syncRes.ok,
-                error: syncRes.ok ? undefined : syncData.error,
-              })
-            } catch (syncErr) {
-              actionResults.push({ action: 'sync_calendar', success: false, error: syncErr instanceof Error ? syncErr.message : 'Sync failed' })
             }
-            break
           }
-          case 'digest_meeting': {
-            const { id: digestMeetingId } = act.data as { id: string }
-            if (!digestMeetingId) {
-              actionResults.push({ action: 'digest_meeting', success: false, error: 'Missing meeting id' })
-              break
-            }
-            try {
-              const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
-              const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
-              const digestRes = await fetch(`${baseUrl}/api/ai/meeting-digest`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  cookie: request.headers.get('cookie') || '',
-                },
-                body: JSON.stringify({ meetingId: digestMeetingId }),
-              })
-              const digestData = await digestRes.json()
-              actionResults.push({
-                action: 'digest_meeting',
-                success: digestRes.ok,
-                id: digestMeetingId,
-                error: digestRes.ok ? undefined : digestData.error,
-              })
-            } catch (digestErr) {
-              actionResults.push({ action: 'digest_meeting', success: false, error: digestErr instanceof Error ? digestErr.message : 'Digest failed' })
-            }
+
+          // If no tool use in this iteration, we're done
+          if (!hasToolUse || response.stop_reason === 'end_turn') {
             break
           }
         }
+
+        // --- Execute kira-actions from the final text ---
+        const actions: Array<{ action: string; data: Record<string, unknown> }> = []
+        const actionRegex = /```kira-action\n([\s\S]*?)```/g
+        let match
+        while ((match = actionRegex.exec(fullText)) !== null) {
+          try {
+            const parsed = JSON.parse(match[1])
+            const { action, data, ...rest } = parsed
+            actions.push({ action, data: data || rest })
+          } catch {
+            // skip malformed
+          }
+        }
+
+        const actionResults: Array<{ action: string; success: boolean; id?: string; error?: string }> = []
+
+        for (const act of actions) {
+          try {
+            switch (act.action) {
+              case 'create_task': {
+                const { data: task, error } = await supabase
+                  .from('tasks')
+                  .insert({ ...act.data, user_id: user.id })
+                  .select()
+                  .single()
+                actionResults.push({ action: 'create_task', success: !error, id: task?.id, error: error?.message })
+                break
+              }
+              case 'edit_task': {
+                const { id, ...updates } = act.data as { id: string; [key: string]: unknown }
+                const { error } = await supabase.from('tasks').update(updates).eq('id', id)
+                actionResults.push({ action: 'edit_task', success: !error, id, error: error?.message })
+                break
+              }
+              case 'delete_task': {
+                const { id } = act.data as { id: string }
+                const { error } = await supabase.from('tasks').update({ status: 'deleted' }).eq('id', id)
+                actionResults.push({ action: 'delete_task', success: !error, id, error: error?.message })
+                break
+              }
+              case 'create_meeting': {
+                const md = act.data as Record<string, unknown>
+                const meetingData = {
+                  title: md.title || md.summary || 'Sin título',
+                  scheduled_at: md.scheduled_at || null,
+                  duration_mins: md.duration_mins || null,
+                  participants: md.participants || null,
+                  pre_notes: md.pre_notes || null,
+                  user_id: user.id,
+                  status: 'scheduled',
+                }
+                const { data: meeting, error } = await supabase
+                  .from('meetings')
+                  .insert(meetingData)
+                  .select()
+                  .single()
+                actionResults.push({ action: 'create_meeting', success: !error, id: meeting?.id, error: error?.message })
+                break
+              }
+              case 'edit_meeting': {
+                const { id, ...updates } = act.data as { id: string; [key: string]: unknown }
+                const { error } = await supabase.from('meetings').update(updates).eq('id', id)
+                actionResults.push({ action: 'edit_meeting', success: !error, id, error: error?.message })
+                break
+              }
+              case 'delete_meeting': {
+                const { id } = act.data as { id: string }
+                const { error } = await supabase.from('meetings').update({ status: 'cancelled' }).eq('id', id)
+                actionResults.push({ action: 'delete_meeting', success: !error, id, error: error?.message })
+                break
+              }
+              case 'save_memory': {
+                const { category, content: memContent } = act.data as { category: string; content: string }
+                const { error } = await supabase.from('kira_memory').insert({
+                  user_id: user.id,
+                  category: category || 'general',
+                  content: memContent,
+                  source_conversation_id: convId,
+                })
+                actionResults.push({ action: 'save_memory', success: !error, error: error?.message })
+                break
+              }
+              case 'delete_memory': {
+                const { content_match } = act.data as { content_match: string }
+                const { error } = await supabase
+                  .from('kira_memory')
+                  .delete()
+                  .eq('user_id', user.id)
+                  .ilike('content', `%${content_match}%`)
+                actionResults.push({ action: 'delete_memory', success: !error, error: error?.message })
+                break
+              }
+              case 'create_calendar_event': {
+                if (!googleToken) {
+                  actionResults.push({ action: 'create_calendar_event', success: false, error: 'Google Calendar no conectado' })
+                  break
+                }
+                const calData = act.data as Record<string, unknown> || {}
+                const evTitle = (calData.title || calData.summary || 'Sin título') as string
+                const evStart = (calData.start || calData.dateTime || calData.start_time) as string
+                const evEnd = (calData.end || calData.end_time) as string | undefined
+                const evDesc = (calData.description || calData.notes) as string | undefined
+                const evAttendees = (calData.attendees) as string | undefined
+                if (!evStart) {
+                  actionResults.push({ action: 'create_calendar_event', success: false, error: 'Missing start time' })
+                  break
+                }
+                const evLocation = (calData.location) as string | undefined
+                const evAddMeet = calData.add_meet as boolean | undefined
+                const calEvent: Record<string, unknown> = {
+                  summary: evTitle,
+                  start: { dateTime: evStart, timeZone: 'Europe/Madrid' },
+                  end: { dateTime: evEnd || new Date(new Date(evStart).getTime() + 60 * 60 * 1000).toISOString(), timeZone: 'Europe/Madrid' },
+                }
+                if (evDesc) calEvent.description = evDesc
+                if (evLocation) calEvent.location = evLocation
+                if (evAttendees) {
+                  calEvent.attendees = evAttendees.split(',').map((email: string) => ({ email: email.trim() }))
+                }
+                if (evAddMeet) {
+                  calEvent.conferenceData = {
+                    createRequest: { requestId: `kira-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } },
+                  }
+                }
+                try {
+                  const calUrl = 'https://www.googleapis.com/calendar/v3/calendars/primary/events' + (evAddMeet ? '?conferenceDataVersion=1' : '')
+                  const calRes = await fetch(calUrl, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(calEvent),
+                  })
+                  const calResult = await calRes.json()
+                  actionResults.push({
+                    action: 'create_calendar_event',
+                    success: calRes.ok,
+                    id: calResult.id,
+                    error: calRes.ok ? undefined : calResult.error?.message,
+                  })
+                } catch (calErr) {
+                  actionResults.push({ action: 'create_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
+                }
+                break
+              }
+              case 'update_calendar_event': {
+                if (!googleToken) {
+                  actionResults.push({ action: 'update_calendar_event', success: false, error: 'Google Calendar no conectado' })
+                  break
+                }
+                const upData = act.data as Record<string, unknown> || {}
+                const eventId = upData.event_id as string
+                if (!eventId) {
+                  actionResults.push({ action: 'update_calendar_event', success: false, error: 'Missing event_id' })
+                  break
+                }
+                try {
+                  const getRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
+                    headers: { Authorization: `Bearer ${googleToken}` },
+                  })
+                  if (!getRes.ok) {
+                    const getErr = await getRes.json()
+                    actionResults.push({ action: 'update_calendar_event', success: false, error: getErr.error?.message || 'Event not found' })
+                    break
+                  }
+                  const existing = await getRes.json()
+                  if (upData.title) existing.summary = upData.title
+                  if (upData.start) existing.start = { dateTime: upData.start, timeZone: 'Europe/Madrid' }
+                  if (upData.end) existing.end = { dateTime: upData.end, timeZone: 'Europe/Madrid' }
+                  if (upData.description !== undefined) existing.description = upData.description || ''
+                  if (upData.location !== undefined) existing.location = upData.location || ''
+                  const currentAttendees: Array<{ email: string; responseStatus?: string }> = existing.attendees || []
+                  if (upData.add_attendees) {
+                    const toAdd = (upData.add_attendees as string).split(',').map(e => e.trim()).filter(Boolean)
+                    for (const email of toAdd) {
+                      if (!currentAttendees.some(a => a.email === email)) {
+                        currentAttendees.push({ email })
+                      }
+                    }
+                    existing.attendees = currentAttendees
+                  }
+                  if (upData.remove_attendees) {
+                    const toRemove = (upData.remove_attendees as string).split(',').map(e => e.trim().toLowerCase())
+                    existing.attendees = currentAttendees.filter(a => !toRemove.includes(a.email.toLowerCase()))
+                  }
+                  const wantMeet = upData.add_meet as boolean
+                  let confVersion = ''
+                  if (wantMeet && !existing.hangoutLink) {
+                    existing.conferenceData = {
+                      createRequest: { requestId: `kira-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } },
+                    }
+                    confVersion = '?conferenceDataVersion=1'
+                  }
+                  const separator = confVersion ? '&' : '?'
+                  const patchRes = await fetch(
+                    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}${confVersion}${separator}sendUpdates=all`,
+                    {
+                      method: 'PUT',
+                      headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify(existing),
+                    }
+                  )
+                  const patchResult = await patchRes.json()
+                  actionResults.push({
+                    action: 'update_calendar_event',
+                    success: patchRes.ok,
+                    id: eventId,
+                    error: patchRes.ok ? undefined : patchResult.error?.message,
+                  })
+                } catch (calErr) {
+                  actionResults.push({ action: 'update_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
+                }
+                break
+              }
+              case 'delete_calendar_event': {
+                if (!googleToken) {
+                  actionResults.push({ action: 'delete_calendar_event', success: false, error: 'Google Calendar no conectado' })
+                  break
+                }
+                const delData = act.data as Record<string, unknown> || {}
+                const delEventId = delData.event_id as string
+                if (!delEventId) {
+                  actionResults.push({ action: 'delete_calendar_event', success: false, error: 'Missing event_id' })
+                  break
+                }
+                try {
+                  const sendNotif = delData.send_notifications !== false ? 'all' : 'none'
+                  const delRes = await fetch(
+                    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(delEventId)}?sendUpdates=${sendNotif}`,
+                    {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${googleToken}` },
+                    }
+                  )
+                  actionResults.push({
+                    action: 'delete_calendar_event',
+                    success: delRes.status === 204 || delRes.ok,
+                    id: delEventId,
+                    error: delRes.ok || delRes.status === 204 ? undefined : 'Failed to delete event',
+                  })
+                } catch (calErr) {
+                  actionResults.push({ action: 'delete_calendar_event', success: false, error: calErr instanceof Error ? calErr.message : 'Calendar error' })
+                }
+                break
+              }
+              case 'create_category': {
+                const { name } = act.data as { name: string }
+                if (!name) {
+                  actionResults.push({ action: 'create_category', success: false, error: 'Missing name' })
+                  break
+                }
+                const { data: cat, error } = await supabase
+                  .from('categories')
+                  .insert({ user_id: user.id, name })
+                  .select()
+                  .single()
+                actionResults.push({ action: 'create_category', success: !error, id: cat?.id, error: error?.message })
+                break
+              }
+              case 'create_project': {
+                const projData = act.data as { name: string; description?: string }
+                if (!projData.name) {
+                  actionResults.push({ action: 'create_project', success: false, error: 'Missing name' })
+                  break
+                }
+                const { data: proj, error } = await supabase
+                  .from('projects')
+                  .insert({ user_id: user.id, name: projData.name, description: projData.description || null })
+                  .select()
+                  .single()
+                actionResults.push({ action: 'create_project', success: !error, id: proj?.id, error: error?.message })
+                break
+              }
+              case 'sync_calendar': {
+                try {
+                  const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
+                  const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
+                  const syncRes = await fetch(`${baseUrl}/api/calendar/sync`, {
+                    method: 'POST',
+                    headers: { cookie: request.headers.get('cookie') || '' },
+                  })
+                  const syncData = await syncRes.json()
+                  actionResults.push({ action: 'sync_calendar', success: syncRes.ok, error: syncRes.ok ? undefined : syncData.error })
+                } catch (syncErr) {
+                  actionResults.push({ action: 'sync_calendar', success: false, error: syncErr instanceof Error ? syncErr.message : 'Sync failed' })
+                }
+                break
+              }
+              case 'digest_meeting': {
+                const { id: digestMeetingId } = act.data as { id: string }
+                if (!digestMeetingId) {
+                  actionResults.push({ action: 'digest_meeting', success: false, error: 'Missing meeting id' })
+                  break
+                }
+                try {
+                  const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
+                  const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
+                  const digestRes = await fetch(`${baseUrl}/api/ai/meeting-digest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', cookie: request.headers.get('cookie') || '' },
+                    body: JSON.stringify({ meetingId: digestMeetingId }),
+                  })
+                  const digestData = await digestRes.json()
+                  actionResults.push({ action: 'digest_meeting', success: digestRes.ok, id: digestMeetingId, error: digestRes.ok ? undefined : digestData.error })
+                } catch (digestErr) {
+                  actionResults.push({ action: 'digest_meeting', success: false, error: digestErr instanceof Error ? digestErr.message : 'Digest failed' })
+                }
+                break
+              }
+            }
+          } catch (err) {
+            actionResults.push({ action: act.action, success: false, error: err instanceof Error ? err.message : 'Unknown error' })
+          }
+        }
+
+        // Send action results
+        if (actionResults.length > 0) {
+          controller.enqueue(new TextEncoder().encode(
+            sseEncode('actions', actionResults)
+          ))
+        }
+
+        // Clean display text
+        const displayText = fullText.replace(/```kira-action\n[\s\S]*?```/g, '').trim()
+
+        // Save assistant message
+        if (convId) {
+          await supabase.from('chat_messages').insert({
+            conversation_id: convId,
+            user_id: user.id,
+            role: 'assistant',
+            content: displayText,
+            actions_executed: actionResults.length > 0 ? actionResults : [],
+          })
+          await supabase
+            .from('chat_conversations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', convId)
+        }
+
+        // Send done event
+        controller.enqueue(new TextEncoder().encode(
+          sseEncode('done', {
+            conversationId: convId,
+            actions: actionResults,
+            toolCalls: toolCalls.map(tc => ({ name: tc.name, id: tc.id })),
+          })
+        ))
+
+        // Fire-and-forget: silent observation
+        const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
+        const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
+        fetch(`${baseUrl}/api/ai/observe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', cookie: request.headers.get('cookie') || '' },
+          body: JSON.stringify({
+            messages: [...messages, { role: 'assistant', content: displayText }],
+            conversationId: convId,
+          }),
+        }).catch(() => {})
+
+        controller.close()
       } catch (err) {
-        actionResults.push({ action: act.action, success: false, error: err instanceof Error ? err.message : 'Unknown error' })
+        console.error('[KIRA AI] chat error:', err)
+        controller.enqueue(new TextEncoder().encode(
+          sseEncode('error', { message: err instanceof Error ? err.message : 'Chat failed' })
+        ))
+        controller.close()
       }
-    }
+    },
+  })
 
-    // Clean the response text (remove action blocks for display)
-    const displayText = content.text.replace(/```kira-action\n[\s\S]*?```/g, '').trim()
-
-    // Save assistant message to DB
-    if (convId) {
-      await supabase.from('chat_messages').insert({
-        conversation_id: convId,
-        user_id: user.id,
-        role: 'assistant',
-        content: displayText,
-        actions_executed: actionResults.length > 0 ? actionResults : [],
-      })
-
-      // Update conversation title and updated_at
-      await supabase
-        .from('chat_conversations')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', convId)
-    }
-
-    // --- Fire-and-forget: silent observation of user behavior ---
-    const origin = request.headers.get('origin') || request.headers.get('x-forwarded-host') || ''
-    const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`
-    fetch(`${baseUrl}/api/ai/observe`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        cookie: request.headers.get('cookie') || '',
-      },
-      body: JSON.stringify({
-        messages: [...messages, { role: 'assistant', content: displayText }],
-        conversationId: convId,
-      }),
-    }).catch(() => { /* silent */ })
-
-    return NextResponse.json({
-      message: displayText,
-      actions: actionResults,
-      conversationId: convId,
-    })
-  } catch (err: unknown) {
-    console.error('[KIRA AI] chat error:', err)
-    const errMessage = err instanceof Error ? err.message : 'Chat failed'
-    return NextResponse.json({ error: errMessage }, { status: 500 })
-  }
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  })
 }

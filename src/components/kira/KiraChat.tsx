@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Send, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2,
-  X, ArrowLeft, Bot, FolderOpen, ChevronRight
+  X, ArrowLeft, Bot, FolderOpen, ChevronRight, Globe, Code, Brain, Monitor, Loader2
 } from 'lucide-react'
 import { KiraLogo } from '@/components/shared/KiraLogo'
 import { KiraAgents } from '@/components/kira/KiraAgents'
@@ -13,11 +13,14 @@ import { useTasks } from '@/lib/hooks/useTasks'
 import { useTaskStore } from '@/stores/taskStore'
 import { useMeetingStore } from '@/stores/meetingStore'
 import { useMeetings } from '@/lib/hooks/useMeetings'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   actions?: Array<{ action: string; success: boolean; id?: string; error?: string }>
+  toolCalls?: Array<{ id: string; name: string; input?: Record<string, unknown>; result?: string; error?: boolean; loading?: boolean }>
 }
 
 interface Conversation {
@@ -31,8 +34,17 @@ const SUGGESTIONS = [
   'Buenos días, KIRA',
   '¿Qué tengo pendiente?',
   'Créame una task urgente',
-  'Agenda una reunión',
+  'Busca las últimas noticias de IA',
 ]
+
+const TOOL_META: Record<string, { icon: typeof Globe; label: string; color: string }> = {
+  web_search: { icon: Globe, label: 'Buscando en internet', color: '#00D4FF' },
+  get_url_content: { icon: Globe, label: 'Leyendo página', color: '#8B5CF6' },
+  execute_code: { icon: Code, label: 'Ejecutando código', color: '#10B981' },
+  query_knowledge: { icon: Brain, label: 'Buscando en memoria', color: '#F59E0B' },
+  check_mac_status: { icon: Monitor, label: 'Verificando Mac', color: '#6366F1' },
+  delegate_to_mac: { icon: Monitor, label: 'Delegando a Mac', color: '#6366F1' },
+}
 
 type ViewMode = 'chat' | 'conversations' | 'agents' | 'projects'
 
@@ -49,6 +61,8 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
+  const [activeToolCalls, setActiveToolCalls] = useState<ChatMessage['toolCalls']>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [view, setView] = useState<ViewMode>(initialTab === 'agents' ? 'agents' : 'chat')
@@ -59,7 +73,7 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  useEffect(() => { scrollToBottom() }, [messages])
+  useEffect(() => { scrollToBottom() }, [messages, streamingText, activeToolCalls])
 
   const loadConversations = useCallback(async () => {
     try {
@@ -75,8 +89,6 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
       await loadConversations()
       const convs = await fetch('/api/ai/conversations').then(r => r.json()).then(d => d.conversations || []).catch(() => [])
       setConversations(convs)
-
-      // Load specific conversation if provided
       if (initialConversationId) {
         await loadConversation(initialConversationId)
       } else if (convs.length > 0 && initialTab !== 'agents') {
@@ -151,6 +163,8 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
     setMessages(newMessages)
     setInput('')
     setLoading(true)
+    setStreamingText('')
+    setActiveToolCalls([])
 
     try {
       const chatHistory = newMessages.map(m => ({ role: m.role, content: m.content }))
@@ -159,20 +173,104 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: chatHistory, context: buildContext(), conversationId }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error')
 
-      if (data.conversationId && !conversationId) {
-        setConversationId(data.conversationId)
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Error de conexión' }))
+        throw new Error(errData.error || `HTTP ${res.status}`)
+      }
+
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error('No stream')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let accumulatedText = ''
+      let accumulatedToolCalls: NonNullable<ChatMessage['toolCalls']> = []
+      let finalActions: ChatMessage['actions'] = []
+      let finalConvId: string | null = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        let eventType = ''
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7)
+          } else if (line.startsWith('data: ') && eventType) {
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              switch (eventType) {
+                case 'text':
+                  accumulatedText += data.text
+                  setStreamingText(accumulatedText)
+                  break
+
+                case 'tool_start':
+                  accumulatedToolCalls = [...accumulatedToolCalls, {
+                    id: data.id,
+                    name: data.name,
+                    input: data.input,
+                    loading: true,
+                  }]
+                  setActiveToolCalls([...accumulatedToolCalls])
+                  break
+
+                case 'tool_result':
+                  accumulatedToolCalls = accumulatedToolCalls.map(tc =>
+                    tc.id === data.id
+                      ? { ...tc, result: data.result, error: data.error, loading: false }
+                      : tc
+                  )
+                  setActiveToolCalls([...accumulatedToolCalls])
+                  break
+
+                case 'actions':
+                  finalActions = data
+                  break
+
+                case 'done':
+                  finalConvId = data.conversationId
+                  break
+
+                case 'error':
+                  throw new Error(data.message)
+              }
+            } catch (parseErr) {
+              if (parseErr instanceof Error && parseErr.message !== 'Unexpected end of JSON input') {
+                if (eventType === 'error' || parseErr.message.startsWith('Chat failed')) throw parseErr
+              }
+            }
+            eventType = ''
+          }
+        }
+      }
+
+      // Finalize: add assistant message
+      const displayText = accumulatedText.replace(/```kira-action\n[\s\S]*?```/g, '').trim()
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: displayText,
+        actions: finalActions,
+        toolCalls: accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
+      }])
+      setStreamingText('')
+      setActiveToolCalls([])
+
+      if (finalConvId && !conversationId) {
+        setConversationId(finalConvId)
         loadConversations()
       }
 
-      setMessages(prev => [...prev, {
-        role: 'assistant', content: data.message, actions: data.actions,
-      }])
-
-      if (data.actions?.length > 0) { refetchTasks(); refetchMeetings() }
+      if (finalActions && finalActions.length > 0) { refetchTasks(); refetchMeetings() }
     } catch (err) {
+      setStreamingText('')
+      setActiveToolCalls([])
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: err instanceof Error ? `Error: ${err.message}` : 'Error al comunicarme. Inténtalo de nuevo.',
@@ -207,6 +305,107 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
     const hours = Math.floor(mins / 60)
     if (hours < 24) return `${hours}h`
     return `${Math.floor(hours / 24)}d`
+  }
+
+  // --- Tool Call Card ---
+  const ToolCallCard = ({ tc }: { tc: NonNullable<ChatMessage['toolCalls']>[number] }) => {
+    const meta = TOOL_META[tc.name] || { icon: Bot, label: tc.name, color: '#888' }
+    const Icon = meta.icon
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-start gap-2.5 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[11px]"
+      >
+        <div
+          className="h-6 w-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+          style={{ backgroundColor: `${meta.color}15` }}
+        >
+          {tc.loading ? (
+            <Loader2 className="h-3 w-3 animate-spin" style={{ color: meta.color }} />
+          ) : (
+            <Icon className="h-3 w-3" style={{ color: meta.color }} />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="font-medium text-foreground/80">{meta.label}</span>
+          {tc.input && 'query' in tc.input && tc.input.query ? (
+            <span className="text-muted-foreground ml-1">— &quot;{String(tc.input.query).slice(0, 60)}&quot;</span>
+          ) : null}
+          {tc.input && 'url' in tc.input && tc.input.url ? (
+            <span className="text-muted-foreground ml-1 truncate block">{String(tc.input.url).slice(0, 80)}</span>
+          ) : null}
+          {!tc.loading && tc.result && (
+            <p className="text-muted-foreground/70 mt-1 line-clamp-2">{tc.result.slice(0, 200)}</p>
+          )}
+          {tc.error && (
+            <p className="text-red-400/80 mt-1">{tc.result?.slice(0, 100)}</p>
+          )}
+        </div>
+      </motion.div>
+    )
+  }
+
+  // --- Message Bubble ---
+  const MessageBubble = ({ msg }: { msg: ChatMessage }) => {
+    const isUser = msg.role === 'user'
+    return (
+      <motion.div
+        className={cn('flex', isUser ? 'justify-end' : 'justify-start')}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+      >
+        <div className={cn('max-w-[85%] md:max-w-[70%]', isUser ? '' : 'space-y-2')}>
+          {/* Tool calls (before text for assistant) */}
+          {!isUser && msg.toolCalls && msg.toolCalls.length > 0 && (
+            <div className="space-y-1.5">
+              {msg.toolCalls.map((tc) => (
+                <ToolCallCard key={tc.id} tc={tc} />
+              ))}
+            </div>
+          )}
+
+          {/* Text bubble */}
+          {msg.content && (
+            <div
+              className={cn(
+                'text-[13px] leading-relaxed px-4 py-3',
+                isUser
+                  ? 'rounded-[20px] rounded-br-md bg-[#00D4FF] text-black'
+                  : 'rounded-[20px] rounded-bl-md bg-white/[0.05] border border-white/[0.08] text-foreground'
+              )}
+            >
+              {isUser ? (
+                <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+              ) : (
+                <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-black/20 prose-pre:rounded-lg prose-code:text-[#00D4FF] prose-a:text-[#00D4FF]">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                </div>
+              )}
+
+              {/* Action results */}
+              {msg.actions && msg.actions.length > 0 && (
+                <div className={cn('mt-2 space-y-1 pt-2', isUser ? 'border-t border-black/10' : 'border-t border-white/[0.08]')}>
+                  {msg.actions.map((act, j) => (
+                    <div key={j} className="flex items-center gap-1.5 text-[11px]">
+                      {act.success ? (
+                        <CheckCircle2 className={cn('h-3 w-3 shrink-0', isUser ? 'text-emerald-700' : 'text-emerald-400')} />
+                      ) : (
+                        <AlertCircle className="h-3 w-3 text-red-400 shrink-0" />
+                      )}
+                      <span className={act.success ? (isUser ? 'opacity-80' : 'text-muted-foreground') : 'text-red-400'}>
+                        {actionLabel(act.action)}{!act.success && act.error ? `: ${act.error}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    )
   }
 
   // --- Conversations view ---
@@ -298,7 +497,6 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
                     whileTap={{ scale: 0.97 }}
                     className="glass-card !rounded-2xl p-4 cursor-pointer"
                     onClick={() => {
-                      // Start a conversation in project context
                       setMessages([])
                       setConversationId(null)
                       setInput(`Hablemos sobre el proyecto "${project.name}"`)
@@ -323,6 +521,8 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
   }
 
   // --- Chat view (main) ---
+  const streamDisplayText = streamingText.replace(/```kira-action\n[\s\S]*?```/g, '').trim()
+
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
@@ -356,7 +556,7 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-3 min-h-0 scrollbar-hide">
-        {messages.length === 0 ? (
+        {messages.length === 0 && !loading ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <motion.div
               className="mb-4"
@@ -368,7 +568,7 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
             </motion.div>
             <h2 className="text-sm font-semibold text-foreground mb-1">Hola, soy KIRA</h2>
             <p className="text-xs text-muted-foreground mb-5 max-w-sm">
-              Puedo gestionar tasks, meetings, calendario, y recordar cosas sobre ti.
+              Puedo gestionar tasks, meetings, calendario, buscar en internet, ejecutar código, y recordar cosas sobre ti.
             </p>
             <div className="flex flex-wrap gap-2 justify-center max-w-sm">
               {SUGGESTIONS.map((s, i) => (
@@ -389,52 +589,43 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
         ) : (
           <>
             {messages.map((msg, i) => (
-              <motion.div
-                key={i}
-                className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <div
-                  className={cn(
-                    'max-w-[85%] md:max-w-[70%] text-[13px] leading-relaxed px-4 py-3',
-                    msg.role === 'user'
-                      ? 'rounded-[20px] rounded-br-md bg-[#00D4FF] text-black'
-                      : 'rounded-[20px] rounded-bl-md bg-white/[0.05] border border-white/[0.08] text-foreground'
-                  )}
-                >
-                  <div className="whitespace-pre-wrap break-words">{msg.content}</div>
-                  {msg.actions && msg.actions.length > 0 && (
-                    <div className={cn('mt-2 space-y-1 pt-2', msg.role === 'user' ? 'border-t border-black/10' : 'border-t border-white/[0.08]')}>
-                      {msg.actions.map((act, j) => (
-                        <div key={j} className="flex items-center gap-1.5 text-[11px]">
-                          {act.success ? (
-                            <CheckCircle2 className={cn('h-3 w-3 shrink-0', msg.role === 'user' ? 'text-emerald-700' : 'text-emerald-400')} />
-                          ) : (
-                            <AlertCircle className="h-3 w-3 text-red-400 shrink-0" />
-                          )}
-                          <span className={act.success ? (msg.role === 'user' ? 'opacity-80' : 'text-muted-foreground') : 'text-red-400'}>
-                            {actionLabel(act.action)}{!act.success && act.error ? `: ${act.error}` : ''}
-                          </span>
-                        </div>
+              <MessageBubble key={i} msg={msg} />
+            ))}
+
+            {/* Streaming state */}
+            {loading && (
+              <motion.div className="flex justify-start" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <div className="max-w-[85%] md:max-w-[70%] space-y-2">
+                  {/* Active tool calls */}
+                  {activeToolCalls && activeToolCalls.length > 0 && (
+                    <div className="space-y-1.5">
+                      {activeToolCalls.map((tc) => (
+                        <ToolCallCard key={tc.id} tc={tc} />
                       ))}
                     </div>
                   )}
-                </div>
-              </motion.div>
-            ))}
-            {loading && (
-              <motion.div className="flex justify-start" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="rounded-[20px] rounded-bl-md px-4 py-3 bg-white/[0.05] border border-white/[0.08]">
-                  <div className="flex items-center gap-2.5">
-                    <motion.div
-                      className="h-2 w-2 rounded-full bg-[#00D4FF]"
-                      animate={{ scale: [1, 1.3, 1], opacity: [1, 0.3, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    />
-                    <span className="text-xs text-muted-foreground">Pensando...</span>
-                  </div>
+
+                  {/* Streaming text or thinking indicator */}
+                  {streamDisplayText ? (
+                    <div className="rounded-[20px] rounded-bl-md px-4 py-3 bg-white/[0.05] border border-white/[0.08] text-[13px] leading-relaxed">
+                      <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-black/20 prose-pre:rounded-lg prose-code:text-[#00D4FF] prose-a:text-[#00D4FF]">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamDisplayText}</ReactMarkdown>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-[20px] rounded-bl-md px-4 py-3 bg-white/[0.05] border border-white/[0.08]">
+                      <div className="flex items-center gap-2.5">
+                        <motion.div
+                          className="h-2 w-2 rounded-full bg-[#00D4FF]"
+                          animate={{ scale: [1, 1.3, 1], opacity: [1, 0.3, 1] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {activeToolCalls && activeToolCalls.length > 0 ? 'Procesando...' : 'Pensando...'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
