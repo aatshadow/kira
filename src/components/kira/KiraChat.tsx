@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Send, CheckCircle2, AlertCircle, Plus, MessageSquare, Trash2,
-  X, ArrowLeft, Bot, FolderOpen, ChevronRight, Globe, Code, Brain, Monitor, Loader2, Mail, Phone
+  X, ArrowLeft, Bot, FolderOpen, ChevronRight, Globe, Code, Brain, Monitor, Loader2, Mail, Phone,
+  Mic, MicOff, Volume2, VolumeX
 } from 'lucide-react'
 import { KiraLogo } from '@/components/shared/KiraLogo'
 import { KiraAgents } from '@/components/kira/KiraAgents'
@@ -60,6 +61,7 @@ const TOOL_META: Record<string, { icon: typeof Globe; label: string; color: stri
   linkedin_post: { icon: Globe, label: 'Publicando en LinkedIn', color: '#0A66C2' },
   linkedin_message: { icon: Globe, label: 'Enviando mensaje LinkedIn', color: '#0A66C2' },
   linkedin_status: { icon: Globe, label: 'Verificando LinkedIn', color: '#0A66C2' },
+  self_code: { icon: Code, label: 'Codeando cambios en KIRA', color: '#10B981' },
 }
 
 type ViewMode = 'chat' | 'conversations' | 'agents' | 'projects'
@@ -85,11 +87,150 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // --- Voice state ---
+  const [isListening, setIsListening] = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(false) // TTS auto-speak responses
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null)
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   useEffect(() => { scrollToBottom() }, [messages, streamingText, activeToolCalls])
+
+  // --- Voice: Speech-to-Text ---
+  const startListening = useCallback(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognitionAPI) return
+
+    const recognition = new SpeechRecognitionAPI()
+    recognition.lang = 'es-ES'
+    recognition.interimResults = true
+    recognition.continuous = true
+    recognition.maxAlternatives = 1
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
+      let transcript = ''
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript
+      }
+      setInput(transcript)
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      // Auto-send on voice stop if there's text
+      const textarea = inputRef.current
+      if (textarea && textarea.value.trim()) {
+        setTimeout(() => {
+          const finalText = textarea.value.trim()
+          if (finalText) sendMessage(finalText)
+        }, 300)
+      }
+    }
+
+    recognition.onerror = () => {
+      setIsListening(false)
+    }
+
+    recognition.start()
+    recognitionRef.current = recognition
+    setIsListening(true)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      recognitionRef.current = null
+    }
+    setIsListening(false)
+  }, [])
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      stopListening()
+    } else {
+      startListening()
+    }
+  }, [isListening, startListening, stopListening])
+
+  // --- Voice: Text-to-Speech (ElevenLabs) ---
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const speakText = useCallback(async (text: string) => {
+    if (!text.trim()) return
+
+    // Stop any current audio
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+
+    setIsSpeaking(true)
+
+    try {
+      const res = await fetch('/api/ai/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+
+      if (!res.ok) {
+        setIsSpeaking(false)
+        return
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audioRef.current = audio
+
+      audio.onended = () => {
+        setIsSpeaking(false)
+        URL.revokeObjectURL(url)
+        audioRef.current = null
+      }
+      audio.onerror = () => {
+        setIsSpeaking(false)
+        URL.revokeObjectURL(url)
+        audioRef.current = null
+      }
+
+      await audio.play()
+    } catch {
+      setIsSpeaking(false)
+    }
+  }, [])
+
+  const stopSpeaking = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setIsSpeaking(false)
+  }, [])
+
+  // Auto-speak KIRA responses when voice mode is on
+  useEffect(() => {
+    if (!voiceEnabled) return
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg?.role === 'assistant' && lastMsg.content && !loading) {
+      speakText(lastMsg.content)
+    }
+  }, [messages, loading, voiceEnabled, speakText])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) recognitionRef.current.stop()
+      if (audioRef.current) audioRef.current.pause()
+    }
+  }, [])
 
   const loadConversations = useCallback(async () => {
     try {
@@ -102,13 +243,20 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
 
   useEffect(() => {
     const init = async () => {
-      await loadConversations()
-      const convs = await fetch('/api/ai/conversations').then(r => r.json()).then(d => d.conversations || []).catch(() => [])
-      setConversations(convs)
-      if (initialConversationId) {
-        await loadConversation(initialConversationId)
-      } else if (convs.length > 0 && initialTab !== 'agents') {
-        await loadConversation(convs[0].id)
+      try {
+        const res = await fetch('/api/ai/conversations')
+        if (!res.ok) return
+        const data = await res.json()
+        const convs = data.conversations || []
+        setConversations(convs)
+
+        if (initialConversationId) {
+          await loadConversation(initialConversationId)
+        } else if (convs.length > 0 && initialTab !== 'agents') {
+          await loadConversation(convs[0].id)
+        }
+      } catch (err) {
+        console.error('[KIRA] Init error:', err)
       }
     }
     init()
@@ -120,17 +268,27 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
   const loadConversation = async (convId: string) => {
     try {
       const res = await fetch(`/api/ai/conversations?id=${convId}`)
-      if (!res.ok) return
+      if (!res.ok) {
+        console.warn('[KIRA] Failed to load conversation:', res.status)
+        return
+      }
       const data = await res.json()
-      const loadedMessages: ChatMessage[] = (data.messages || []).map((m: { role: string; content: string; actions_executed?: unknown[] }) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        actions: m.actions_executed as ChatMessage['actions'],
-      }))
+      const rawMessages = data.messages || []
+      console.log(`[KIRA] Loaded conversation ${convId}: ${rawMessages.length} messages`, rawMessages.slice(0, 2))
+
+      const loadedMessages: ChatMessage[] = rawMessages
+        .map((m: { role: string; content: string | null; actions_executed?: unknown[] }) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content || '',
+          actions: m.actions_executed as ChatMessage['actions'],
+        }))
+        .filter((m: ChatMessage) => m.content || (m.actions && m.actions.length > 0)) // keep messages with content or actions
       setMessages(loadedMessages)
       setConversationId(convId)
       setView('chat')
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('[KIRA] Error loading conversation:', err)
+    }
   }
 
   const newConversation = () => {
@@ -567,6 +725,19 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
           )
         })}
         <div className="flex-1" />
+        {/* Voice toggle */}
+        <button
+          onClick={() => setVoiceEnabled(!voiceEnabled)}
+          className={cn(
+            'flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-all cursor-pointer shrink-0',
+            voiceEnabled
+              ? 'bg-[rgba(0,212,255,0.1)] text-[#00D4FF] border border-[rgba(0,212,255,0.25)]'
+              : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.04]'
+          )}
+        >
+          {voiceEnabled ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
+          {voiceEnabled ? 'Voice ON' : 'Voice'}
+        </button>
         <button
           onClick={newConversation}
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium text-[#00D4FF] hover:bg-[rgba(0,212,255,0.06)] transition-colors cursor-pointer shrink-0"
@@ -658,15 +829,41 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
 
       {/* Input */}
       <div className="mt-3 pb-1">
+        {/* Speaking indicator */}
+        <AnimatePresence>
+          {isSpeaking && (
+            <motion.button
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              onClick={stopSpeaking}
+              className="flex items-center justify-center gap-2 w-full px-3 py-2 mb-1.5 rounded-xl text-[11px] font-medium text-[#00D4FF] bg-[rgba(0,212,255,0.06)] border border-[rgba(0,212,255,0.15)] cursor-pointer"
+            >
+              <motion.div
+                className="flex items-center gap-0.5"
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                <span className="h-1.5 w-0.5 rounded-full bg-[#00D4FF]" />
+                <span className="h-2.5 w-0.5 rounded-full bg-[#00D4FF]" />
+                <span className="h-1.5 w-0.5 rounded-full bg-[#00D4FF]" />
+                <span className="h-3 w-0.5 rounded-full bg-[#00D4FF]" />
+                <span className="h-1.5 w-0.5 rounded-full bg-[#00D4FF]" />
+              </motion.div>
+              <span>KIRA hablando — toca para parar</span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+
         <div className="relative rounded-2xl bg-white/[0.04] border border-white/[0.08] overflow-hidden">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Escríbele a KIRA..."
+            placeholder={isListening ? 'Escuchando...' : 'Escríbele a KIRA...'}
             rows={1}
-            className="w-full resize-none bg-transparent px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+            className="w-full resize-none bg-transparent px-4 py-3 pr-24 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
             style={{ minHeight: '44px', maxHeight: '120px' }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement
@@ -674,14 +871,40 @@ export function KiraChat({ initialConversationId, initialTab }: { initialConvers
               target.style.height = Math.min(target.scrollHeight, 120) + 'px'
             }}
           />
-          <motion.button
-            onClick={() => sendMessage()}
-            disabled={!input.trim() || loading}
-            whileTap={{ scale: 0.9 }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-xl bg-[#00D4FF] text-black flex items-center justify-center disabled:opacity-20 cursor-pointer transition-opacity"
-          >
-            <Send className="h-3.5 w-3.5" />
-          </motion.button>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            {/* Mic button */}
+            <motion.button
+              onClick={toggleListening}
+              whileTap={{ scale: 0.9 }}
+              className={cn(
+                'h-8 w-8 rounded-xl flex items-center justify-center cursor-pointer transition-all',
+                isListening
+                  ? 'bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.4)]'
+                  : 'bg-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.1]'
+              )}
+            >
+              {isListening ? (
+                <motion.div
+                  animate={{ scale: [1, 1.15, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  <MicOff className="h-3.5 w-3.5" />
+                </motion.div>
+              ) : (
+                <Mic className="h-3.5 w-3.5" />
+              )}
+            </motion.button>
+
+            {/* Send button */}
+            <motion.button
+              onClick={() => sendMessage()}
+              disabled={!input.trim() || loading}
+              whileTap={{ scale: 0.9 }}
+              className="h-8 w-8 rounded-xl bg-[#00D4FF] text-black flex items-center justify-center disabled:opacity-20 cursor-pointer transition-opacity"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </motion.button>
+          </div>
         </div>
       </div>
     </div>

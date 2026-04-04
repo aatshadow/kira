@@ -2,9 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
+// In-memory cache to avoid repeated Google token validation within the same request lifecycle
+// Key: token, Value: { valid, timestamp }
+const tokenCache = new Map<string, { valid: boolean; ts: number }>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 /**
  * Get a valid Google access token, refreshing if needed.
- * Priority: session.provider_token → stored token (validated) → refresh via refresh_token
+ * Priority: session.provider_token → stored token → refresh via refresh_token
+ * Uses an in-memory cache to avoid hitting Google's tokeninfo on every call.
  */
 export async function getValidGoogleToken(
   supabase: SupabaseClient,
@@ -13,14 +19,13 @@ export async function getValidGoogleToken(
   // 1. Try session provider_token (available right after login)
   const { data: { session } } = await supabase.auth.getSession()
   if (session?.provider_token) {
-    // Validate it's still good
-    const valid = await validateGoogleToken(session.provider_token)
+    const valid = await validateGoogleTokenCached(session.provider_token)
     if (valid) {
-      // Also update stored token
-      await supabase.from('profiles').update({
+      // Store in profile only if it changed
+      supabase.from('profiles').update({
         google_access_token: session.provider_token,
         updated_at: new Date().toISOString(),
-      }).eq('id', userId)
+      }).eq('id', userId).then(() => {}) // fire-and-forget
       return session.provider_token
     }
   }
@@ -33,7 +38,7 @@ export async function getValidGoogleToken(
     .single()
 
   if (profile?.google_access_token) {
-    const valid = await validateGoogleToken(profile.google_access_token)
+    const valid = await validateGoogleTokenCached(profile.google_access_token)
     if (valid) return profile.google_access_token
   }
 
@@ -41,7 +46,8 @@ export async function getValidGoogleToken(
   if (profile?.google_refresh_token) {
     const newToken = await refreshGoogleToken(profile.google_refresh_token)
     if (newToken) {
-      // Store the new token
+      // Cache the new token as valid
+      tokenCache.set(newToken, { valid: true, ts: Date.now() })
       await supabase.from('profiles').update({
         google_access_token: newToken,
         updated_at: new Date().toISOString(),
@@ -53,10 +59,31 @@ export async function getValidGoogleToken(
   return null
 }
 
+async function validateGoogleTokenCached(token: string): Promise<boolean> {
+  const cached = tokenCache.get(token)
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    return cached.valid
+  }
+
+  const valid = await validateGoogleToken(token)
+  tokenCache.set(token, { valid, ts: Date.now() })
+
+  // Clean old entries
+  if (tokenCache.size > 50) {
+    const now = Date.now()
+    for (const [k, v] of tokenCache) {
+      if (now - v.ts > CACHE_TTL) tokenCache.delete(k)
+    }
+  }
+
+  return valid
+}
+
 async function validateGoogleToken(token: string): Promise<boolean> {
   try {
     const res = await fetch(
-      `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${token}`
+      `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${token}`,
+      { signal: AbortSignal.timeout(3000) }
     )
     return res.ok
   } catch {

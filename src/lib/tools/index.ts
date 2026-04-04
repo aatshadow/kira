@@ -13,6 +13,38 @@ export interface ToolResult {
   error?: boolean
 }
 
+// Tools that execute fast enough to run inline in the chat stream (< 3s)
+// Everything else runs as a background agent task
+// Tools fast enough to run inline in the chat stream
+// Only truly long tasks (self_code, delegate_to_mac) stay as background
+const INLINE_TOOLS = new Set([
+  'query_knowledge',
+  'check_mac_status',
+  'whatsapp_status',
+  'manychat_status',
+  'linkedin_status',
+  'linkedin_profile',
+  'read_emails',
+  'read_email_content',
+  'send_email',
+  'whatsapp_chats',
+  'whatsapp_messages',
+  'whatsapp_search_contacts',
+  'whatsapp_send',
+  'manychat_search',
+  'manychat_subscriber_info',
+  'manychat_send',
+  'web_search',
+  'get_url_content',
+  'execute_code',
+  'linkedin_post',
+  'linkedin_message',
+])
+
+export function isInlineTool(name: string): boolean {
+  return INLINE_TOOLS.has(name)
+}
+
 export async function executeTool(
   name: string,
   input: Record<string, unknown>,
@@ -149,8 +181,7 @@ export async function executeTool(
       if (error) return { content: `WhatsApp error: ${error}`, error: true }
       if (msgs.length === 0) return { content: 'No se encontraron mensajes.' }
       const formatted = msgs.map(m => {
-        const sender = m.isFromMe ? 'Tú' : (m.sender || 'Contacto')
-        return `[${m.timestamp}] **${sender}**: ${m.content}`
+        return `[${m.timestamp}] **${m.senderName}**: ${m.content}`
       }).join('\n')
       return { content: formatted }
     }
@@ -236,6 +267,32 @@ export async function executeTool(
       const { connected, name, error } = await checkLinkedInStatus()
       if (!connected) return { content: `LinkedIn no conectado: ${error}`, error: true }
       return { content: `LinkedIn CONECTADO — Perfil: ${name}` }
+    }
+
+    // --- Self-coding: KIRA modifies her own code ---
+    case 'self_code': {
+      const instruction = input.instruction as string
+      if (!instruction) return { content: 'Necesito una instrucción de qué codear.', error: true }
+
+      try {
+        const result = await delegateToMac(userId, {
+          type: 'claude_code',
+          description: `Self-code: ${instruction.slice(0, 100)}`,
+          payload: { instruction },
+        })
+
+        if (result.mac_online) {
+          return {
+            content: `Tarea de coding enviada (ID: ${result.taskId}). Tu Mac está online — Claude Code está trabajando en ello. Te aviso cuando termine.`,
+          }
+        } else {
+          return {
+            content: `Tarea de coding encolada (ID: ${result.taskId}). Tu Mac está offline — se ejecutará cuando conectes.`,
+          }
+        }
+      } catch (err) {
+        return { content: `Error delegando: ${err instanceof Error ? err.message : 'Unknown'}`, error: true }
+      }
     }
 
     default:
@@ -496,6 +553,21 @@ export const KIRA_TOOLS = [
       type: 'object' as const,
       properties: {},
       required: [],
+    },
+  },
+  // --- Self-coding ---
+  {
+    name: 'self_code',
+    description: 'Modify KIRA\'s own code. Use this when the user asks you to change something about the app: UI changes, new features, behavior adjustments, bug fixes, etc. This launches Claude Code on the user\'s Mac to edit the KIRA codebase. The dev server will hot-reload automatically. Requires the Mac daemon to be running.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        instruction: {
+          type: 'string',
+          description: 'Detailed instruction of what to code/change. Be specific: mention file paths, component names, exact changes needed. Example: "In src/components/kira/KiraChat.tsx, change the placeholder text from \'Escríbele a KIRA...\' to \'Habla con KIRA...\'"',
+        },
+      },
+      required: ['instruction'],
     },
   },
 ] as const

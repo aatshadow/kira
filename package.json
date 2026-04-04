@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001",
-    "dev:all": "npx concurrently -n kira,whatsapp,daemon,jarvis -c cyan,green,magenta,yellow \"next dev -p 3001\" \"cd /Users/alex/whatsapp-mcp/whatsapp-bridge && ./whatsapp-bridge\" \"npx tsx scripts/kira-daemon.ts\" \"cd /Users/alex/Downloads/OpenJarvis-main && .venv/bin/jarvis serve -e cloud -m claude-haiku-4-5\"",
+    "dev": "next dev -p 3001 --hostname 0.0.0.0",
+    "dev:all": "npx concurrently -n kira,whatsapp,daemon,jarvis -c cyan,green,magenta,yellow \"next dev -p 3001 --hostname 0.0.0.0\" \"cd /Users/alex/whatsapp-mcp/whatsapp-bridge && ./whatsapp-bridge\" \"npx tsx scripts/kira-daemon.ts\" \"cd /Users/alex/Downloads/OpenJarvis-main && .venv/bin/jarvis serve -e cloud -m claude-haiku-4-5\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

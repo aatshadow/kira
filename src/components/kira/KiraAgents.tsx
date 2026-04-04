@@ -20,6 +20,7 @@ const AGENT_META: Record<string, { icon: React.ElementType; color: string; gradi
   whatsapp: { icon: MessageCircle, color: '#25D366', gradient: 'from-[#25D366]/20 to-[#25D366]/5' },
   notion: { icon: FileText, color: '#FFFFFF', gradient: 'from-white/10 to-white/3' },
   instagram: { icon: Instagram, color: '#E4405F', gradient: 'from-[#E4405F]/20 to-[#E4405F]/5' },
+  manychat: { icon: Instagram, color: '#E4405F', gradient: 'from-[#E4405F]/20 to-[#E4405F]/5' },
   linkedin: { icon: Linkedin, color: '#0A66C2', gradient: 'from-[#0A66C2]/20 to-[#0A66C2]/5' },
   terminal: { icon: Terminal, color: '#22C55E', gradient: 'from-[#22C55E]/20 to-[#22C55E]/5' },
 }

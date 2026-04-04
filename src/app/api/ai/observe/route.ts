@@ -29,6 +29,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true }) // not enough to analyze
   }
 
+  // --- Auto-generate conversation title (after 2+ messages) ---
+  if (conversationId && messages.length >= 2) {
+    try {
+      const titleMessages = messages.slice(0, 6)
+      const titleConvo = titleMessages.map(m => `${m.role}: ${m.content.slice(0, 200)}`).join('\n')
+      const titleRes = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 60,
+        messages: [{
+          role: 'user',
+          content: `Genera un título corto (máximo 6 palabras) en español para esta conversación. Solo responde con el título, sin comillas ni puntuación extra.\n\n${titleConvo}`,
+        }],
+      })
+      const title = titleRes.content[0].type === 'text'
+        ? titleRes.content[0].text.trim().slice(0, 80)
+        : null
+      if (title) {
+        await supabase
+          .from('chat_conversations')
+          .update({ title })
+          .eq('id', conversationId)
+          .eq('user_id', user.id)
+      }
+    } catch {
+      // Title generation failed, not critical
+    }
+  }
+
   // Load existing memories to avoid duplicates
   const { data: existingMemories } = await supabase
     .from('kira_memory')
@@ -83,7 +111,7 @@ Si no hay nada nuevo, responde: []`
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
       messages: [{ role: 'user', content: prompt }],
     })

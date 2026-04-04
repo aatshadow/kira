@@ -154,6 +154,50 @@ async function executeTask(task: {
         return { result: { stdout: output.slice(0, 50_000) } }
       }
 
+      case 'claude_code': {
+        // Self-coding: KIRA modifies her own codebase using Claude Code CLI
+        const instruction = task.payload.instruction as string
+        if (!instruction) return { error: 'No instruction provided' }
+
+        console.log(`[Task ${task.id}] Self-coding: ${instruction.slice(0, 100)}...`)
+
+        // Run Claude Code in the KIRA project directory with --print for non-interactive
+        const projectDir = resolve(__dirname, '..')
+        const escapedInstruction = instruction.replace(/'/g, "'\\''")
+
+        return new Promise((resolveTask) => {
+          const child = exec(
+            `cd "${projectDir}" && claude --print '${escapedInstruction}'`,
+            {
+              timeout: 600_000, // 10 min max
+              encoding: 'utf-8',
+              maxBuffer: 50 * 1024 * 1024,
+              env: { ...process.env, PATH: process.env.PATH },
+            },
+            (error, stdout, stderr) => {
+              if (error) {
+                resolveTask({
+                  error: `Claude Code error: ${error.message.slice(0, 1000)}`,
+                  result: { stdout: stdout?.slice(0, 10_000), stderr: stderr?.slice(0, 5_000) },
+                })
+              } else {
+                resolveTask({
+                  result: {
+                    output: stdout?.slice(0, 20_000) || 'Done (no output)',
+                    stderr: stderr?.slice(0, 5_000),
+                  },
+                })
+              }
+            }
+          )
+
+          // Log progress
+          child.stdout?.on('data', (data: string) => {
+            process.stdout.write(`[Claude] ${data}`)
+          })
+        })
+      }
+
       case 'jarvis_agent': {
         // Forward to local Jarvis if running
         const jarvisRes = await fetch('http://127.0.0.1:8000/v1/managed-agents', {

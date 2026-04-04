@@ -24,6 +24,7 @@ interface WAMessage {
   id: string
   chatJid: string
   sender: string
+  senderName: string
   content: string
   timestamp: string
   isFromMe: boolean
@@ -36,20 +37,19 @@ export async function listWhatsAppChats(
 ): Promise<{ chats: WAChat[]; error?: string }> {
   try {
     const db = getDb()
-    let rows
-    if (query) {
-      rows = db.prepare(
-        `SELECT c.jid, c.name, c.last_message_time,
-          (SELECT content FROM messages WHERE chat_jid = c.jid ORDER BY timestamp DESC LIMIT 1) as last_msg
+    // Use a correlated subquery only for last message (unavoidable),
+    // but limit the chat scan first for speed
+    const sql = query
+      ? `SELECT c.jid, c.name, c.last_message_time,
+          (SELECT content FROM messages m WHERE m.chat_jid = c.jid ORDER BY m.timestamp DESC LIMIT 1) as last_msg
          FROM chats c WHERE c.name LIKE ? ORDER BY c.last_message_time DESC LIMIT ?`
-      ).all(`%${query}%`, limit)
-    } else {
-      rows = db.prepare(
-        `SELECT c.jid, c.name, c.last_message_time,
-          (SELECT content FROM messages WHERE chat_jid = c.jid ORDER BY timestamp DESC LIMIT 1) as last_msg
+      : `SELECT c.jid, c.name, c.last_message_time,
+          (SELECT content FROM messages m WHERE m.chat_jid = c.jid ORDER BY m.timestamp DESC LIMIT 1) as last_msg
          FROM chats c ORDER BY c.last_message_time DESC LIMIT ?`
-      ).all(limit)
-    }
+
+    const rows = query
+      ? db.prepare(sql).all(`%${query}%`, limit)
+      : db.prepare(sql).all(limit)
     db.close()
 
     const chats: WAChat[] = (rows as Array<Record<string, unknown>>).map(r => ({
@@ -71,21 +71,50 @@ export async function readWhatsAppMessages(
 ): Promise<{ messages: WAMessage[]; error?: string }> {
   try {
     const db = getDb()
+
+    // Get chat name for the conversation
+    const chatRow = db.prepare('SELECT name FROM chats WHERE jid = ?').get(chatJid) as Record<string, unknown> | undefined
+    const chatName = (chatRow?.name as string) || null
+
+    // Get messages with sender name resolved from chats table
     const rows = db.prepare(
-      `SELECT id, chat_jid, sender, content, timestamp, is_from_me, media_type
-       FROM messages WHERE chat_jid = ? ORDER BY timestamp DESC LIMIT ?`
+      `SELECT m.id, m.chat_jid, m.sender, m.content, m.timestamp, m.is_from_me, m.media_type,
+        (SELECT c.name FROM chats c WHERE c.jid = m.sender LIMIT 1) as sender_name
+       FROM messages m WHERE m.chat_jid = ? ORDER BY m.timestamp DESC LIMIT ?`
     ).all(chatJid, limit)
     db.close()
 
-    const messages: WAMessage[] = (rows as Array<Record<string, unknown>>).reverse().map(r => ({
-      id: r.id as string,
-      chatJid: r.chat_jid as string,
-      sender: r.sender as string,
-      content: r.content as string || (r.media_type ? `[${r.media_type}]` : ''),
-      timestamp: r.timestamp as string,
-      isFromMe: !!(r.is_from_me),
-      mediaType: r.media_type as string | undefined,
-    }))
+    const messages: WAMessage[] = (rows as Array<Record<string, unknown>>).reverse().map(r => {
+      const isFromMe = !!(r.is_from_me)
+      const rawSender = r.sender as string || ''
+      const resolvedName = r.sender_name as string | null
+
+      // Build a readable sender name
+      let senderName = 'Desconocido'
+      if (isFromMe) {
+        senderName = 'Tú'
+      } else if (resolvedName) {
+        senderName = resolvedName
+      } else if (chatName && !chatJid.includes('@g.us')) {
+        // 1-on-1 chat: if no sender_name, use the chat name
+        senderName = chatName
+      } else if (rawSender) {
+        // Group chat with unknown sender: show phone number
+        const phone = rawSender.replace(/@.*/, '')
+        senderName = `+${phone}`
+      }
+
+      return {
+        id: r.id as string,
+        chatJid: r.chat_jid as string,
+        sender: rawSender,
+        senderName,
+        content: r.content as string || (r.media_type ? `[${r.media_type}]` : ''),
+        timestamp: r.timestamp as string,
+        isFromMe,
+        mediaType: r.media_type as string | undefined,
+      }
+    })
 
     return { messages }
   } catch (err) {
@@ -118,35 +147,26 @@ export async function sendWhatsApp(
   recipient: string,
   message: string
 ): Promise<{ success: boolean; error?: string }> {
-  // The bridge exposes a send endpoint when running
-  // Try multiple possible endpoints
   let jid = recipient
   if (/^\+?\d+$/.test(recipient.replace(/[\s\-()]/g, ''))) {
     const cleaned = recipient.replace(/[^\d]/g, '')
     jid = `${cleaned}@s.whatsapp.net`
   }
 
-  const endpoints = [
-    'http://localhost:8080/send',
-    'http://localhost:8080/api/send',
-    'http://localhost:8080/api/messages/send',
-  ]
-
-  for (const url of endpoints) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: jid, message, chatJID: jid, text: message }),
-        signal: AbortSignal.timeout(3000),
-      })
-      if (res.ok) return { success: true }
-    } catch {
-      continue
-    }
+  // Use the known working endpoint
+  try {
+    const res = await fetch('http://localhost:8080/api/messages/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: jid, message }),
+      signal: AbortSignal.timeout(5000),
+    })
+    if (res.ok) return { success: true }
+    const err = await res.text()
+    return { success: false, error: `Bridge error ${res.status}: ${err.slice(0, 200)}` }
+  } catch {
+    return { success: false, error: 'No se pudo conectar al bridge de WhatsApp (localhost:8080). ¿Está corriendo?' }
   }
-
-  return { success: false, error: 'No se pudo enviar. El bridge de WhatsApp no tiene endpoint de envío activo. Envía manualmente desde WhatsApp Web.' }
 }
 
 export async function checkWhatsAppStatus(): Promise<{ online: boolean; chatCount?: number; messageCount?: number; error?: string }> {
@@ -169,7 +189,7 @@ export function getRecentChatsForSync(limit: number = 30): Array<{ jid: string; 
     const db = getDb()
     const rows = db.prepare(
       `SELECT c.jid, c.name, c.last_message_time,
-        (SELECT content FROM messages WHERE chat_jid = c.jid ORDER BY timestamp DESC LIMIT 1) as last_msg
+        (SELECT content FROM messages m WHERE m.chat_jid = c.jid ORDER BY m.timestamp DESC LIMIT 1) as last_msg
        FROM chats c WHERE c.last_message_time IS NOT NULL
        ORDER BY c.last_message_time DESC LIMIT ?`
     ).all(limit)
